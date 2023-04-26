@@ -1,0 +1,4 @@
+baseURL = 'https://gelerion.github.io/'
+languageCode = 'en-us'
+title = 'Gelerion Blog'
+theme = 'beautifulhugo'
