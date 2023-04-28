@@ -2,82 +2,89 @@ baseURL = 'https://gelerion.github.io/'
 languageCode = 'en-us'
 title = 'Gelerion Blog'
 author = "Denis"
-theme = 'blackburn'
+theme = 'beautifulhugo'
+
+pygmentsStyle = "trac"
+pygmentsUseClasses = true
+pygmentsCodeFences = true
+pygmentsCodefencesGuessSyntax = true
 
 # Shown in the side menu
 copyright = "&copy; 2023. All rights reserved."
 canonifyurls = true
 paginate = 10
+googleAnalytics = "G-962FFPME5F"
 
 [indexes]
   tag = "tags"
   topic = "topics"
 
 [params]
-  # Shown in the home page
-  subtitle = "Personal Blog"
+  subtitle = ""
   brand = "Gelerion"
-  googleAnalytics = "G-962FFPME5F"
-  disqus = "YGelerion"
-  # CSS name for highlight.js
-  highlightjs = "androidstudio"
-  highlightjs_extra_languages = ["yaml"]
+  disqus = "Gelerion"
   dateFormat = "02 Jan 2006, 15:04"
-  # Include any custom CSS and/or JS files
-  # (relative to /static folder)
-  custom_css = ["css/my.css"]
-  custom_js = ["js/my.js"]
 
-  [params.piwikAnalytics]
-    siteid = 2
-    piwikroot = "//analytics.example.com/"
+  comments = true
+  readingTime = true
+  wordCount = true
+  #useHLJS = true
+  socialShare = true
+  delayDisqus = true
+  showRelatedPosts = true
+ 
+[Author]
+  # Set only your "username" for default hosts and full URLs otherwise (e.g., "https://MyGitLab.org/username")
+  #name = "Gelerion"
+  website = "yourwebsite.com"
+  #email = "youremail@domain.com"
+  github = "Gelerion"
+  linkedin = "denisshuvalov"
+  stackoverflow = "users/6350670/gelerion"
+
+# https://gohugo.io/content-management/taxonomies/
+[taxonomies]
+  tag = 'tags'
+  category = 'categories'
+
 
 [menu]
   # Shown in the side menu.
   [[menu.main]]
     name = "Home"
-    pre = "<i class='fa fa-home fa-fw'></i>"
     weight = 1
     identifier = "home"
     url = "/"
   [[menu.main]]
     name = "Posts"
-    pre = "<i class='fa fa-list fa-fw'></i>"
     weight = 2
     identifier = "post"
     url = "/post/"
   [[menu.main]]
     name = "About"
-    pre = "<i class='fa fa-user fa-fw'></i>"
     weight = 3
     identifier = "about"
     url = "/about/"
   [[menu.main]]
-    name = "Contact"
-    pre = "<i class='fa fa-phone fa-fw'></i>"
+    name = "Tags"
     weight = 4
-    url = "/contact/"
+    identifier = "tags"
+    url = "/tags/"
 
-[social]
-  # Link your social networking accounts to the side menu
-  # by entering your username or ID.
+[markup]
+  [markup.highlight]
+    anchorLineNos = false
+    codeFences = true
+    guessSyntax = true
+    hl_Lines = ''
+    hl_inline = false
+    lineAnchors = ''
+    lineNoStart = 1
+    lineNos = false
+    lineNumbersInTable = true
+    noClasses = true
+    noHl = false
+    style = 'github'
+    tabWidth = 4
 
-  # SNS microblogging
-  twitter = "*"
-  facebook = "*"
-  weibo = "*"
-  tumblr = "*"
-
-  # SNS photo/video sharing
-  instagram = "*"
-  youtube = "*"
-
-  # SNS career oriented
-  linkedin = "*"
-
-  # SNS news
-  reddit = "*"
-
-  # Techie
-  github = "https://github.com/Gelerion"
-  stackoverflow = "https://stackoverflow.com/users/6350670/gelerion"
+#demo: https://hugo-theme-beautifulhugo.netlify.app/
