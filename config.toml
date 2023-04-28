@@ -1,6 +1,6 @@
 baseURL = 'https://gelerion.github.io/'
 languageCode = 'en-us'
-title = 'Gelerion' Blog'
+title = 'Gelerion Blog'
 author = "Denis"
 theme = 'blackburn'
 
