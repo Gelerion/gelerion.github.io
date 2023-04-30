@@ -7,7 +7,7 @@ author: "Gelerion"
 ## Overview  
 Are you planning to publish your first artifact to Maven Central and make it available to a wider audience? Congratulations, you're taking an important step in contributing to the open-source community! However, the process may not be as straightforward as you expect. In this post, we'll go over some common pitfalls to avoid to make your publishing experience smoother.
 
-Before we dive into the details, it's essential to note that the [official documentation](https://central.sonatype.org/publish/publish-guide/) on Maven Central is a great resource. It's well-written, concise, and provides numerous examples. We strongly recommend reading it carefully to avoid any confusion or mistakes.
+Before we dive into the details, it's essential to note that the [official documentation](https://central.sonatype.org/publish/publish-guide/) on Maven Central is a great resource. It's well-written, concise, and provides numerous examples. I strongly recommend reading it carefully to avoid any confusion or mistakes.
 
 Ready-to-use examples:
 
@@ -48,7 +48,7 @@ mvn release:perform
 
 ```
 
-However, you may encounter the error above during the process
+However, you may encounter the above error during the process
 &nbsp;  
 &nbsp;  
 ##### Solution
