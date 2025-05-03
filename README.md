@@ -5,14 +5,14 @@ This is a personal tech blog built with Hugo using the BeautifulHugo theme.
 ## Prerequisites
 
 * Git
-* Hugo (v0.80+ recommended)
+* [Hugo](https://gohugo.io/getting-started/installing/) (v0.80+ recommended)  
 * (Optional) Homebrew (on macOS) or your favorite package manager
 
 ## Installation
 
 1.  Clone the repository with submodules:
     ```bash
-    git clone --recurse-submodules [https://github.com/Gelerion/gelerion.github.io.git](https://github.com/Gelerion/gelerion.github.io.git)
+    git clone --recurse-submodules https://github.com/Gelerion/gelerion.github.io.git &&
     cd gelerion.github.io
     ```
 2.  Initialize/update submodules (if you didn’t use `--recurse-submodules`):
