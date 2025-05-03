@@ -1,18 +1,39 @@
 baseURL = 'https://gelerion.github.io/'
 languageCode = 'en-us'
 title = 'Gelerion Blog'
-author = "Denis"
+author = "Denis Shuvalov"
 theme = 'beautifulhugo'
+description  = "Java, JVM performance, Streaming & AI engineering notes"
+keywords = [
+  "java",
+  "jvm",
+  "spring-boot",
+  "microservices",
+  "streaming",
+  "lakehouse",
+  "flink",
+  "kafka",
+  "trino",
+  "performance",
+  "ai",
+  "rag",
+  "openai",
+  "vector-databases",
+  "api-design",
+  "architecture",
+  "observability",
+  "terraform",
+  "kubernetes",
+  "design-docs"
+]
 
-pygmentsStyle = "trac"
-pygmentsUseClasses = true
-pygmentsCodeFences = true
-pygmentsCodefencesGuessSyntax = true
+enableRobotsTXT = true 
+enableGitInfo = true
+summaryLength = 70
 
 # Shown in the side menu
-copyright = "&copy; 2023. All rights reserved."
+copyright = "&copy; Denis Shuvalov. All rights reserved."
 canonifyurls = true
-paginate = 10
 googleAnalytics = "G-962FFPME5F"
 
 [indexes]
@@ -23,8 +44,8 @@ googleAnalytics = "G-962FFPME5F"
   subtitle = ""
   brand = "Gelerion"
   disqus = "Gelerion"
-  dateFormat = "02 Jan 2006, 15:04"
-
+  dateFormat = "02 Jan 2006"
+  
   comments = true
   readingTime = true
   wordCount = true
@@ -32,11 +53,32 @@ googleAnalytics = "G-962FFPME5F"
   socialShare = true
   delayDisqus = true
   showRelatedPosts = true
+
+[params.plausible]
+  domain = "gelerion.github.io"
+
+[related]
+  threshold = 80 # Lower score means more matches (default 80)
+  includeNewer = true
+  toLower = false
+
+  [[related.indices]]
+    name = "tags"
+    weight = 100 
+  [[related.indices]]
+    name = "categories"
+    weight = 80
+  [[related.indices]]
+    name = "series"
+    weight = 120 
+
+[pagination]
+  pagerSize = 10
  
 [Author]
   # Set only your "username" for default hosts and full URLs otherwise (e.g., "https://MyGitLab.org/username")
   #name = "Gelerion"
-  website = "yourwebsite.com"
+  website = "https://gelerion.github.io/"
   #email = "youremail@domain.com"
   github = "Gelerion"
   linkedin = "denisshuvalov"
@@ -46,6 +88,7 @@ googleAnalytics = "G-962FFPME5F"
 [taxonomies]
   tag = 'tags'
   category = 'categories'
+  series = "series"
 
 
 [menu]
@@ -82,9 +125,29 @@ googleAnalytics = "G-962FFPME5F"
     lineNoStart = 1
     lineNos = false
     lineNumbersInTable = true
-    noClasses = true
+    noClasses = false
     noHl = false
     style = 'github'
     tabWidth = 4
+
+[services]
+  [services.disqus]
+    shortname = "Gelerion"
+
+[outputs]
+  home    = ["HTML", "RSS", "JSON"]   # RSS for readers, JSON for search
+  section = ["HTML", "RSS"]
+
+# Optional lightweight search for a static site
+[outputFormats.JSON]
+  mediaType = "application/json"
+  baseName  = "index"
+
+[minify]
+  disableXML = true         
+
+[asset]                     
+  [asset.postCSS]
+    includeFiles = ["css/**/*.css"]
 
 #demo: https://hugo-theme-beautifulhugo.netlify.app/
