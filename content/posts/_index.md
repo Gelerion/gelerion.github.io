@@ -1,5 +1,4 @@
 ---
-title       : "Blog"
 description : "Deep-dives on data, streaming & microservices"
 date        : "2025-05-04T10:00:00+03:00"
 type        : "posts"

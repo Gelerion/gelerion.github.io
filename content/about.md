@@ -1,9 +1,9 @@
-+++
-title = "About"
-date = "2025-05-03"
-sidemenu = "true"
-description = "Who I am, what I build, and why I write"
-+++
+---
+date: "2025-05-03"
+sidemenu: "true"
+description: "Who I am, what I build, and why I write"
+toc: false
+---
 
 # Hi, I’m Denis (aka Gelerion)
 
