@@ -1,9 +1,31 @@
 ---
 title: "Spark and Data Sketches: Taming count-distinct"
 date: 2023-07-09T19:00:53+03:00
+lastmod: 2023-07-09T20:00:00+03:00 
 author: "Gelerion"
+categories: ["Big Data", "Streaming"]
+summary: "Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting the exact number of distinct values can consume a significant amount of resources while taking a long time even when using a parallelized processing engine. To address this challenge, you can use probabilistic algorithms"
+description: "Speed up Spark `count distinct` on big data. Learn how probabilistic Data Sketches (Theta/HLL) enable efficient cardinality estimation & faster ETL."
+tags: [
+  "spark",
+  "streaming",
+  "data-sketches",
+  "analytics",
+  "probabilistic-algorithms"
+]
+keywords: [
+  "spark data sketches",
+  "count-distinct",
+  "probabilistic algorithms",
+  "theta sketch",
+  "hyperloglog",
+  "ETL pipelines",
+  "data analytics"
+]
+toc: true
 ---
-
+## Introduction
+  
 Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting the exact number of distinct values can consume a significant amount of resources while taking a long time even when using a parallelized processing engine. To address this challenge, you can use probabilistic algorithms
 
 ## Probabilistic algorithms
@@ -33,8 +55,9 @@ These metrics should be aggregated daily to provide trend reports and insights i
 > 💡 **Note:** You can find the code here: [advertising-campaign-analysis](https://github.com/Gelerion/advertising-campaign-analysis)
   
 ## Building histroical layer
-
-#### Input
+  
+**Input**
+  
 Impressions and clicks events are continuously generated, streamed in real-time, and stored on Amazon S3. Events are bucketed by date in the `yyyy-mm-dd` format. To simplify the process, impressions and clicks are unified into a single stream. 
 
 ```
@@ -46,8 +69,8 @@ s3/
 
 ```
 
-#### Schema
-
+**Schema**
+  
 | Column Name | Data Type | Description                                                |
 |-------------|-----------|------------------------------------------------------------|
 | ad_id       | String    | Unique identifier for each ad                              |
@@ -298,7 +321,7 @@ Output:
 In this article, you have learned how to create an efficient ETL process that tackles the difficulties of generating count-distinct reports over massive data. Additionally, you have seen an example of merging raw and historical data without the need to re-aggregate it and efficiently responding to count-distinct queries on the aggregated data.
 
 As you can see, Data Sketches can be a powerful tool in your arsenal, and the [spark-sketches](https://github.com/Gelerion/spark-sketches) library helps you to seamlessly integrate them into Spark workflows.
-
-### Stay tuned
+   
+**Stay tuned**  
 In the second part, you will learn how to stream aggregated data to Druid for interactive analysis in near real time. 
   

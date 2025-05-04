@@ -3,6 +3,16 @@
   <div class="row">
     <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
       <article role="main" class="blog-post">
+        {{ if ne .Params.toc false }}
+          {{ if gt (len .TableOfContents) 10 }} {{/* Heuristic: Don't show empty or tiny ToC */}}
+            <aside id="toc-container" class="toc-container"> {{/* Use appropriate ID/class for styling */}}
+              <h2 class="toc-title">Table of Contents</h2>
+              {{ .TableOfContents }} {{/* This renders the actual ToC HTML */}}
+            </aside>
+          {{ end }}
+        {{ end }}
+
+
         {{ .Content }}
 
         {{ if .Params.tags }}

@@ -101,18 +101,18 @@ googleAnalytics = "G-962FFPME5F"
   [[menu.main]]
     name = "Posts"
     weight = 2
-    identifier = "post"
-    url = "/post/"
-  [[menu.main]]
-    name = "About"
-    weight = 3
-    identifier = "about"
-    url = "/about/"
+    identifier = "posts"
+    url = "/posts/"
   [[menu.main]]
     name = "Tags"
     weight = 4
     identifier = "tags"
     url = "/tags/"
+  [[menu.main]]
+    name = "About"
+    weight = 3
+    identifier = "about"
+    url = "/about/"
 
 [markup]
   [markup.highlight]
@@ -129,6 +129,10 @@ googleAnalytics = "G-962FFPME5F"
     noHl = false
     style = 'github'
     tabWidth = 4
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel   = 3
+    ordered = false
 
 [services]
   [services.disqus]
@@ -149,5 +153,9 @@ googleAnalytics = "G-962FFPME5F"
 [asset]                     
   [asset.postCSS]
     includeFiles = ["css/**/*.css"]
+
+[development]
+  buildDrafts = true
+  buildFuture = true
 
 #demo: https://hugo-theme-beautifulhugo.netlify.app/
