@@ -45,6 +45,7 @@ googleAnalytics = "G-962FFPME5F"
   brand = "Gelerion"
   disqus = "Gelerion"
   dateFormat = "02 Jan 2006"
+  favicon = "favicon.ico"
   
   comments = true
   readingTime = true
