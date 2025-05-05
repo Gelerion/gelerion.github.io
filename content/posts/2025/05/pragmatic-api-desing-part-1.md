@@ -1,7 +1,7 @@
 ---
 title: "Pragmatic API Design: Balancing Best Practices and Real-World Needs (Part 1)"
-date: 2023-07-09T19:00:53+03:00
-lastmod: 2023-07-09T20:00:00+03:00 
+date: 2025-05-05T08:00:00+03:00
+lastmod: 2025-05-05T08:00:00+03:00
 author: "Gelerion"
 series: ["Pragmatic API Design"] 
 draft: false 
