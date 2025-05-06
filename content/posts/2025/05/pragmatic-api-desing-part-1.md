@@ -29,7 +29,7 @@ keywords: [
 ]
 toc: true
 ---
-# Intorduction
+# Introduction
 
 Collaboration is central to modern software engineering, and APIs are the critical interfaces that enable it – connecting frontends to backends, services to services, and businesses to partners. Crafting truly effective APIs—intuitive, flexible, and robust—isn't just about following rules blindly; it requires a pragmatic approach, carefully balancing established best practices with the practical needs of your consumers and evolving systems.
 
