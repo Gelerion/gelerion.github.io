@@ -134,7 +134,10 @@ googleAnalytics = "G-962FFPME5F"
     startLevel = 2
     endLevel   = 3
     ordered = false
-
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+      
 [services]
   [services.disqus]
     shortname = "Gelerion"
