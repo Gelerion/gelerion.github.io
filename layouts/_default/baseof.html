@@ -16,7 +16,7 @@
         const savedTheme = localStorage.getItem('theme-preference');
         const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         
-        // Use saved theme or default to light (ignore system preference by default)
+        // Use saved theme or default to light (ignore system preference)
         let theme = savedTheme || 'light';
         
         // Apply theme immediately to prevent FOUC

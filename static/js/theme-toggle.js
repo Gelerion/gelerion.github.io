@@ -20,10 +20,9 @@
     // Initialize theme on page load
     function initTheme() {
         const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         
-        // Use saved theme, or system preference, or default
-        let theme = savedTheme || (systemPrefersDark ? DARK_THEME : 'light');
+        // Use saved theme or default to light (ignore system preference)
+        let theme = savedTheme || 'light';
         
         setTheme(theme);
         updateToggleButton(theme);
@@ -60,28 +59,14 @@
         }
     }
     
-    // Listen for system theme changes
-    function watchSystemTheme() {
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        mediaQuery.addEventListener('change', function(e) {
-            // Only update if user hasn't set a manual preference
-            if (!localStorage.getItem(THEME_STORAGE_KEY)) {
-                const newTheme = e.matches ? 'dark' : 'light';
-                setTheme(newTheme);
-                updateToggleButton(newTheme);
-            }
-        });
-    }
     
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             initTheme();
-            watchSystemTheme();
         });
     } else {
         initTheme();
-        watchSystemTheme();
     }
     
     // Make toggleTheme available globally
