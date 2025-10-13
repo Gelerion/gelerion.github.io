@@ -45,13 +45,13 @@ Get these right, and your APIs will not only scale beautifully but also become a
 
 As FlexiShop gains traction, its users naturally demand more sophisticated ways to interact with their data:
 
-- "As a returning customer, I want to review my past orders.
+- "As a returning customer, I want to review my past orders."
 - "As a shopper, I want to find products within a certain price range and filter them by brand and customer rating."
 - "As a shopper, I want to see products sorted from the newest to the oldest."
 
-These stories mark a shift — from simple single-resource operations to rich, scalable collection handling. With that shift come new design challenges: How do we support smart data retrieval How do we enable precise filtering, flexible sorting, and robust pagination? These are the cornerstones of effective collection API design we'll explore.
+These stories mark a shift — from simple single-resource operations to rich, scalable collection handling. With that shift come new design challenges: How do we support smart data retrieval? How do we enable precise filtering, flexible sorting, and robust pagination? These are the cornerstones of effective collection API design we'll explore.
 
------
+---
 
 ## Accessing Collections
 
@@ -70,7 +70,7 @@ Two main models emerge for accessing collections related to a specific resource:
 First, **Nested URIs** directly reflect an ownership model (orders belong to an account) using the URI. This approach is quite intuitive for clear parent-child relationships. However, it can lead to deeply nested URLs that become long and brittle, and they can feel awkward if you need to filter by multiple criteria not directly related to the nesting path.
 
 Second, **Flatter URIs with Query Parameters**, you use top-level collection endpoints, and specific criteria like the `accountId` are passed as query parameters—the `?key=value` part of a URL. This pattern offers much greater flexibility for combining multiple filter criteria, scales more gracefully as your API evolves, and is often easier to document consistently. The main trade-off is that the direct hierarchical link might seem less obvious at first glance compared to nested URIs.
-&nbsp;
+
 
 #### “My Data” Scenarios: Implicit vs. Explicit access
 
@@ -97,7 +97,7 @@ curl "https://api.flexishop.io/v1/orders" \
 
 With patterns for accessing collections established, we need to consider how users pinpoint specific items within those, often large, lists. This brings us directly to filtering.
 
------
+---
 
 ## Filtering Collections
 
@@ -117,17 +117,17 @@ When you need more expressive power, several patterns emerge for encoding filter
 
   One approach uses dedicated parameters that imply the condition, such as `priceMin=10&priceMax=50`. This is very easy for clients to understand initially and simple for backends to parse. However, the number of query parameters can explode if you need many conditions per field (e.g., `priceMin`, `priceMax`, `productNameContains`, `productNameStartsWith`), making your API surface large and potentially inconsistent over time. This pattern is best for APIs with a small, fixed set of supported conditions.
 
-&nbsp;
+
 - **Operator in Parameter Name**
 
   Another pattern, sometimes seen in frameworks like Ruby on Rails or Laravel, is putting the operator in the parameter name, like `price[gte]=10&price[lte]=50`. The `[gte]` signifies "greater than or equal to." A benefit is that some backend frameworks handle parsing this natively. However, brackets (`[` and `]`) must be URL-encoded (e.g., `price[gte]=10` becomes `price%5Bgte%5D=10`), which makes URLs longer and less readable. This can also be awkward to define in API specifications like OpenAPI and may lead to less elegant client code generation.
 
-&nbsp;
+
 - **Operator in Parameter Value**
 
   For greater flexibility with URL parameters, we prefer encoding the operator in the parameter value, such as `price=gte:10&price=lte:50`. Here, the parameter name is the field (`price`), and the value (`gte:10`) contains both the operator (`gte`) and its value (`10`), separated by a chosen delimiter (here, a colon). This keeps parameter names simple and avoids special characters that require heavy URL encoding. It's generally easier to model in OpenAPI, leading to cleaner generated client code, and it's extensible—adding new operators involves defining new prefixes for the value string, not entirely new query parameter names. The main trade-off is that you need robust server-side parsing logic to split the operator from the value.
 
-&nbsp;
+
 ### Pragmatic Recommendation
 
 For most APIs that need flexible filtering, we recommend using the **Operator-in-Value** strategy as the default for
@@ -207,7 +207,7 @@ Content-Type: application/json
 
 This JSON structure is far more expressive and cleaner for complex, nested queries than trying to URL-encode everything. It also naturally accommodates other aspects of a data request, like sorting instructions, field selection (projections), and pagination parameters, all in one structured payload.
 
-&nbsp;
+
 #### Which HTTP Method Should You Use for Body-Based Filtering?
 When you decide to send filter criteria in the request body, choosing the right HTTP method is a key consideration, and it's a topic with some debate. Here's a breakdown of your options:
 
@@ -219,7 +219,7 @@ When you decide to send filter criteria in the request body, choosing the right 
 
     The trade-off: you’re stepping slightly outside traditional REST semantics (where reads use `GET`). And by default, `POST` responses aren’t cached by most HTTP intermediaries — caching must be configured explicitly if needed.
 
-&nbsp;
+
 - **Using GET with a Request Body (The Risky Path):**
 
     While the HTTP/1.1 spec (RFC 7231) doesn’t prohibit a body in `GET` requests, it clearly states that such a body has “no defined semantics.” The appeal is understandable: keep the read-only, cacheable nature of `GET` while supporting structured, complex filters.
@@ -228,7 +228,7 @@ When you decide to send filter criteria in the request body, choosing the right 
 
     Bottom line: unless you fully control the request chain (end-to-end), avoid using `GET` with a body. It’s not reliable in real-world environments.
 
-&nbsp;
+
 - **The Future: The HTTP QUERY Method (The Promising Newcomer):**
 
     To overcome the limitations of `GET` (no reliable request body) and `POST` (non-idempotent, not cached by default), the IETF HTTP Working Group has proposed a new method: `QUERY`.
@@ -237,7 +237,7 @@ When you decide to send filter criteria in the request body, choosing the right 
 
     However, as of mid-2025, `QUERY` is still a draft spec. It’s **not** supported in most frameworks, clients, or infrastructure yet. It’s one to watch, but not something you can depend on in production today.
 
-&nbsp;
+
 #### A Note on Caching POST Requests for Search
 
 By default, many systems treat `GET` requests as cacheable, assuming they meet standard criteria. `POST` requests, on the other hand, are generally **not** cached because they're assumed to be non-idempotent.
@@ -251,12 +251,12 @@ To do so:
 
 This setup can significantly improve performance for repeat queries — just be sure caching rules are carefully scoped to avoid stale or unintended results.
 
-&nbsp;
+
 #### When to Use Request Body Filtering (with POST):
 
 This approach (using `POST` to a `/search` or `/query` endpoint) is generally your best bet for rich, complex queries. It's often seen in internal tools, analytics dashboards, advanced search UIs, or any scenario where URL length limits or the sheer complexity of filter structures hinder usability and clarity when using `GET` parameters. The key trade-offs are that you lose default HTTP caching (requiring explicit setup if needed) and the simple shareability of queries via a URL.
 
-&nbsp;
+
 ## Filtering Strategies Summarized: A tiered approach
 
 So, to wrap up our discussion on filtering, here's a pragmatic, tiered approach you can adopt:
@@ -273,7 +273,7 @@ Regardless of the method, always ensure you **validate and sanitize all filter i
 
 With a comprehensive understanding of how to let clients find exactly the resources they need, the next logical step is to ensure those resources are presented in a meaningful order. This brings us to sorting.
 
------
+---
 
 ## Sorting Collections
 
@@ -318,7 +318,7 @@ The backend should ensure proper indexes exist on `createdAt` and `name`. If thi
 
 Once filtering and sorting are in place, the next challenge is handling large result sets. If a query matches thousands of items, returning them all at once isn’t feasible — that’s where pagination comes in.
 
------
+---
 
 ## Pagination
 
@@ -347,11 +347,11 @@ When a query could return many resources, you need to paginate the results. Two 
 
     The trade-offs are increased implementation complexity on the server (to generate and parse these opaque cursors) and that it generally **doesn't allow arbitrary page jumps**; users can typically only navigate to the "next" (and sometimes "previous") page. Getting a total count of all items can also be an expensive separate query, so it's often omitted or handled differently in cursor-based systems.
 
-&nbsp;
+
 #### Implementation Note
 Cursor-based pagination requires a **stable, unique sort order,** such as: `sort=createdAt:desc,id:desc` This prevents records from being duplicated or skipped.
 
-&nbsp;
+
 ### Pragmatic Recommendation
 
 While offset/limit is fine for small datasets or when users need to jump to exact pages, **we recommend cursor-based pagination for most APIs** — especially those working with growing or high-volume data.
@@ -408,7 +408,7 @@ The server uses the cursor to fetch the next 20 items that come after the last i
 
 Now that we've covered the core mechanics for handling collections, let's see how these elements combine to form powerful API endpoints and discuss some overarching performance considerations.
 
------
+---
 
 ## Putting it all together
 
@@ -431,7 +431,7 @@ Here’s how FlexiShop applies these principles in real endpoints:
 - **Continuously monitor and optimize** your API's query performance. Identify slow queries and take steps to improve
   them, often through better indexing or query refactoring.
 
------
+---
 
 ## Quick Reference (Cheat-sheet)
 Here’s a quick summary of our practical recommendations for designing collection-based API endpoints:
@@ -444,7 +444,7 @@ Here’s a quick summary of our practical recommendations for designing collecti
 | **Pagination** | **Default to cursor-based:** `limit=N&cursor=X` | Fast at scale, stable under data changes, index-friendly | `GET /orders?limit=10&cursor=abc123` |
 |  | Use page-based only when needed: `page=N&pageSize=M` | Useful for UIs that require page jumps; less efficient at scale | `GET /products?page=3&pageSize=20` (use with caution) |
 
------
+---
 
 ## Conclusion
 
