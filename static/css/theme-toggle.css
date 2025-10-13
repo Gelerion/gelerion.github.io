@@ -1,0 +1,921 @@
+/* Theme Toggle Styles */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-hover);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px var(--shadow-subtle);
+}
+
+.theme-toggle:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Light mode (default) - Modern, clean palette */
+[data-theme="light"] {
+  /* Primary colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb; /* slightly softer */
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #f3f4f6;
+  
+  /* Text colors */
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-inverse: #ffffff;
+  
+  /* Accent colors */
+  --accent-primary: #3b82f6;
+  --accent-secondary: #8b5cf6;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-error: #ef4444;
+  
+  /* Interactive colors */
+  --link-primary: #1e293b; /* match text color (dark) */
+  --link-hover: #1e293b;  /* keep dark; rely on underline */
+  --link-visited: #1e293b;
+  
+  /* Border colors */
+  --border-primary: #e5e7eb; /* softer borders */
+  --border-secondary: #d1d5db;
+  --border-subtle: #f1f5f9;
+  
+  /* Shadow colors */
+  --shadow-subtle: rgba(0, 0, 0, 0.05);
+  --shadow-medium: rgba(0, 0, 0, 0.1);
+  --shadow-strong: rgba(0, 0, 0, 0.15);
+  
+  /* Code colors */
+  --code-bg: #f6f8fa; /* GitHub-like */
+  --code-border: #eaeef2;
+  --code-text: #1e293b;
+  --code-comment: #64748b;
+  --code-keyword: #7c3aed;
+  --code-string: #059669;
+  --code-number: #dc2626;
+  --code-function: #2563eb;
+  --code-variable: #7c3aed;
+  --code-type: #059669;
+  
+  /* Component colors */
+  --blockquote-bg: #f9fafb;
+  --blockquote-border: #d1d5db; /* subtle, not accent */
+  --blockquote-text: #475569;
+  
+  /* Panel colors */
+  --panel-bg: #ffffff;
+  --panel-border: #e2e8f0;
+  --list-item-bg: #f8fafc;
+  --list-item-hover: #f1f5f9;
+  
+  /* Well/alert colors */
+  --well-bg: #f1f5f9;
+  --well-border: #cbd5e1;
+}
+
+/* Dark mode - Modern dark palette */
+[data-theme="dark"] {
+  /* Warm dark palette */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3a3a3a;
+  --bg-hover: #3a3a3a;
+
+  /* Text */
+  --text-primary: #f5f5dc;
+  --text-secondary: #d4c5a0;
+  --text-tertiary: #b8a082;
+  --text-inverse: #1a1a1a;
+
+  /* Accents */
+  --accent-primary: #d4af37; /* gold */
+  --accent-secondary: #cd853f; /* peru */
+  --accent-success: #90ee90;
+  --accent-warning: #ffd700;
+  --accent-error: #ff6347;
+
+  /* Links */
+  --link-primary: #d4af37;
+  --link-hover: #e6c547;
+  --link-visited: #cd853f;
+
+  /* Borders */
+  --border-primary: #4a4a4a;
+  --border-secondary: #5a5a5a;
+  --border-subtle: #3a3a3a;
+
+  /* Shadows */
+  --shadow-subtle: rgba(0, 0, 0, 0.2);
+  --shadow-medium: rgba(0, 0, 0, 0.4);
+  --shadow-strong: rgba(0, 0, 0, 0.6);
+
+  /* Code */
+  --code-bg: #2d2d2d;
+  --code-border: #4a4a4a;
+  --code-text: #f5f5dc;
+  --code-comment: #8b7355;
+  --code-keyword: #ffd700;
+  --code-string: #90ee90;
+  --code-number: #ff6347;
+  --code-function: #d4af37;
+  --code-variable: #cd853f;
+  --code-type: #90ee90;
+
+  /* Components */
+  --blockquote-bg: #2d2d2d;
+  --blockquote-border: #d4af37;
+  --blockquote-text: #d4c5a0;
+
+  --panel-bg: #2d2d2d;
+  --panel-border: #4a4a4a;
+  --list-item-bg: #3a3a3a;
+  --list-item-hover: #4a4a4a;
+
+  --well-bg: #3a3a3a;
+  --well-border: #5a5a5a;
+}
+
+/* Apply theme variables with improved semantic naming */
+body {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary) !important;
+  border: 0 !important; /* avoid unexpected borders from theme */
+}
+
+/* Header anchors should look like headings, not links */
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+h1 a:hover, h2 a:hover, h3 a:hover, h4 a:hover, h5 a:hover, h6 a:hover {
+  color: var(--link-hover) !important;
+}
+
+p {
+  color: var(--text-primary) !important;
+}
+
+/* Links */
+a {
+  color: var(--link-primary) !important;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover,
+a:focus {
+  color: var(--link-hover) !important;
+  text-decoration: underline;
+}
+
+a:visited {
+  color: var(--link-visited) !important;
+}
+
+p a {
+  color: var(--link-primary) !important;
+}
+
+/* Blockquotes */
+blockquote {
+  background-color: var(--blockquote-bg) !important;
+  border-left: 4px solid var(--blockquote-border) !important;
+  color: var(--blockquote-text) !important;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Code blocks */
+code {
+  background-color: var(--code-bg) !important;
+  color: var(--code-text) !important;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  border: 1px solid var(--code-border);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+pre {
+  background-color: var(--code-bg) !important;
+  border: 1px solid var(--code-border) !important;
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  line-height: 1.5;
+}
+
+pre code {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  color: var(--code-text) !important;
+  font-family: inherit;
+}
+
+/* Ensure code blocks are always readable */
+pre.chroma,
+pre.highlight,
+pre[class*="language-"] {
+  background-color: var(--code-bg) !important;
+  color: var(--code-text) !important;
+  border: 1px solid var(--code-border) !important;
+}
+
+/* Fallback for any unhighlighted code */
+pre:not(.chroma) code {
+  color: var(--code-text) !important;
+}
+
+/* Hugo highlight shortcode support */
+.highlight {
+  background-color: var(--code-bg) !important;
+  border: 1px solid var(--code-border) !important;
+  border-radius: 6px !important;
+  overflow-x: auto !important;
+  padding: 0 !important; /* avoid nested padding */
+}
+
+.highlight pre {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 1rem !important; /* inner padding only here */
+  margin: 0 !important;
+  color: var(--code-text) !important;
+}
+
+.highlight code {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  color: var(--code-text) !important;
+}
+
+/* Avoid double wrapping borders for Chroma output */
+.highlight pre.chroma,
+.highlight .chroma {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Copy button styling */
+.copyCodeButton {
+  position: absolute !important;
+  top: 0.5rem !important;
+  right: 0.5rem !important;
+  background: var(--bg-hover) !important;
+  border: 1px solid var(--border-primary) !important;
+  border-radius: 4px !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.8em !important;
+  cursor: pointer !important;
+  color: var(--text-primary) !important;
+  transition: all 0.2s ease !important;
+}
+
+.copyCodeButton:hover {
+  background: var(--accent-primary) !important;
+  color: var(--text-inverse) !important;
+}
+
+/* Syntax highlighting - Enhanced for Hugo Chroma */
+pre.chroma {
+  color: var(--code-text) !important;
+  background-color: var(--code-bg) !important;
+  border: 1px solid var(--code-border) !important;
+  border-radius: 6px !important;
+  padding: 1rem !important;
+  overflow-x: auto !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  line-height: 1.5 !important;
+  margin: 1rem 0 !important;
+}
+
+/* Override theme's default syntax highlighting */
+pre.chroma,
+pre.chroma code,
+pre.chroma code * {
+  color: var(--code-text) !important;
+  background-color: var(--code-bg) !important;
+}
+
+/* Chroma line numbers */
+pre.chroma .lnt {
+  color: var(--text-tertiary) !important;
+  margin-right: 0.8em !important;
+  padding: 0 0.4em 0 0.4em !important;
+}
+
+pre.chroma .ln {
+  color: var(--text-tertiary) !important;
+  margin-right: 0.8em !important;
+  padding: 0 0.4em 0 0.4em !important;
+}
+
+/* Keywords and reserved words - Enhanced specificity */
+pre.chroma .k,
+pre.chroma .kt,
+pre.chroma .kd,
+pre.chroma .kr,
+pre.chroma .kc,
+pre.chroma .kn,
+pre.chroma .kp {
+  color: var(--code-keyword) !important; 
+  font-weight: bold !important;
+}
+
+/* Operators */
+pre.chroma .o { color: var(--text-primary) !important; font-weight: bold !important; }
+pre.chroma .ow { color: var(--text-primary) !important; font-weight: bold !important; }
+
+/* Built-in functions and names */
+pre.chroma .nb { color: var(--code-function) !important; }
+pre.chroma .nf { color: var(--code-function) !important; font-weight: bold !important; }
+pre.chroma .nc { color: var(--code-type) !important; font-weight: bold !important; }
+pre.chroma .no { color: var(--code-variable) !important; }
+
+/* Comments */
+pre.chroma .c { color: var(--code-comment) !important; font-style: italic !important; }
+pre.chroma .cm { color: var(--code-comment) !important; font-style: italic !important; }
+pre.chroma .c1 { color: var(--code-comment) !important; font-style: italic !important; }
+pre.chroma .cp { color: var(--code-comment) !important; font-style: italic !important; }
+pre.chroma .cs { color: var(--code-comment) !important; font-style: italic !important; }
+
+/* Strings */
+pre.chroma .s { color: var(--code-string) !important; }
+pre.chroma .s1 { color: var(--code-string) !important; }
+pre.chroma .s2 { color: var(--code-string) !important; }
+pre.chroma .sb { color: var(--code-string) !important; }
+pre.chroma .sc { color: var(--code-string) !important; }
+pre.chroma .sd { color: var(--code-string) !important; }
+pre.chroma .se { color: var(--code-string) !important; }
+pre.chroma .sh { color: var(--code-string) !important; }
+pre.chroma .si { color: var(--code-string) !important; }
+pre.chroma .sx { color: var(--code-string) !important; }
+pre.chroma .sa { color: var(--code-string) !important; }
+pre.chroma .dl { color: var(--code-string) !important; }
+
+/* Numbers */
+pre.chroma .m { color: var(--code-number) !important; }
+pre.chroma .mi { color: var(--code-number) !important; }
+pre.chroma .mf { color: var(--code-number) !important; }
+pre.chroma .mh { color: var(--code-number) !important; }
+pre.chroma .il { color: var(--code-number) !important; }
+
+/* Variables and identifiers */
+pre.chroma .n { color: var(--code-text) !important; }
+pre.chroma .na { color: var(--code-variable) !important; }
+pre.chroma .nv { color: var(--code-variable) !important; }
+pre.chroma .vc { color: var(--code-variable) !important; }
+pre.chroma .vg { color: var(--code-variable) !important; }
+pre.chroma .vi { color: var(--code-variable) !important; }
+
+/* Types and classes */
+pre.chroma .nd { color: var(--code-type) !important; font-weight: bold !important; }
+pre.chroma .ne { color: var(--code-type) !important; font-weight: bold !important; }
+pre.chroma .nn { color: var(--code-type) !important; font-weight: bold !important; }
+
+/* Punctuation and delimiters */
+pre.chroma .p { color: var(--text-primary) !important; }
+pre.chroma .pi { color: var(--text-primary) !important; }
+
+/* Generic highlighting */
+pre.chroma .g { color: var(--code-text) !important; }
+pre.chroma .gd { color: var(--code-text) !important; }
+pre.chroma .ge { color: var(--code-text) !important; }
+pre.chroma .gr { color: var(--code-text) !important; }
+pre.chroma .gs { color: var(--code-text) !important; }
+pre.chroma .gt { color: var(--code-text) !important; }
+pre.chroma .gu { color: var(--code-text) !important; }
+
+/* Error highlighting */
+pre.chroma .err { 
+  color: var(--accent-error) !important; 
+  background-color: rgba(239, 68, 68, 0.1) !important; 
+}
+
+/* Line highlighting */
+pre.chroma .hl { 
+  background-color: var(--bg-hover) !important; 
+  display: block !important; 
+  width: 100% !important; 
+}
+
+/* Override theme's default syntax colors completely */
+pre.chroma * {
+  color: inherit !important;
+}
+
+/* Force our color scheme on all syntax elements */
+pre.chroma .k,
+pre.chroma .kt,
+pre.chroma .kd,
+pre.chroma .kr,
+pre.chroma .kc,
+pre.chroma .kn,
+pre.chroma .kp {
+  color: var(--code-keyword) !important;
+  font-weight: bold !important;
+}
+
+pre.chroma .s,
+pre.chroma .s1,
+pre.chroma .s2,
+pre.chroma .sb,
+pre.chroma .sc,
+pre.chroma .sd,
+pre.chroma .se,
+pre.chroma .sh,
+pre.chroma .si,
+pre.chroma .sx,
+pre.chroma .sa,
+pre.chroma .dl {
+  color: var(--code-string) !important;
+}
+
+pre.chroma .c,
+pre.chroma .cm,
+pre.chroma .c1,
+pre.chroma .cp,
+pre.chroma .cs {
+  color: var(--code-comment) !important;
+  font-style: italic !important;
+}
+
+pre.chroma .m,
+pre.chroma .mi,
+pre.chroma .mf,
+pre.chroma .mh,
+pre.chroma .il {
+  color: var(--code-number) !important;
+}
+
+pre.chroma .nb,
+pre.chroma .nf {
+  color: var(--code-function) !important;
+}
+
+pre.chroma .nc,
+pre.chroma .nd,
+pre.chroma .ne,
+pre.chroma .nn {
+  color: var(--code-type) !important;
+  font-weight: bold !important;
+}
+
+pre.chroma .na,
+pre.chroma .nv,
+pre.chroma .vc,
+pre.chroma .vg,
+pre.chroma .vi,
+pre.chroma .no {
+  color: var(--code-variable) !important;
+}
+
+pre.chroma .o,
+pre.chroma .ow {
+  color: var(--text-primary) !important;
+  font-weight: bold !important;
+}
+
+pre.chroma .p,
+pre.chroma .pi {
+  color: var(--text-primary) !important;
+}
+
+/* Additional language-specific highlighting */
+pre.chroma .err {
+  color: var(--accent-error) !important;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+pre.chroma .w {
+  color: var(--accent-warning) !important;
+}
+
+pre.chroma .x {
+  color: var(--text-primary) !important;
+}
+
+/* Ensure all text elements use our theme colors */
+pre.chroma,
+pre.chroma code,
+pre.chroma code *,
+pre.chroma span,
+pre.chroma div {
+  color: var(--code-text) !important;
+}
+
+/* Override any inline styles that might be set by Hugo */
+pre.chroma [style*="color"] {
+  color: var(--code-text) !important;
+}
+
+/* Force syntax highlighting colors */
+pre.chroma .k { color: var(--code-keyword) !important; }
+pre.chroma .kt { color: var(--code-keyword) !important; }
+pre.chroma .kd { color: var(--code-keyword) !important; }
+pre.chroma .kr { color: var(--code-keyword) !important; }
+pre.chroma .kc { color: var(--code-keyword) !important; }
+pre.chroma .kn { color: var(--code-keyword) !important; }
+pre.chroma .kp { color: var(--code-keyword) !important; }
+
+pre.chroma .s { color: var(--code-string) !important; }
+pre.chroma .s1 { color: var(--code-string) !important; }
+pre.chroma .s2 { color: var(--code-string) !important; }
+pre.chroma .sb { color: var(--code-string) !important; }
+pre.chroma .sc { color: var(--code-string) !important; }
+pre.chroma .sd { color: var(--code-string) !important; }
+pre.chroma .se { color: var(--code-string) !important; }
+pre.chroma .sh { color: var(--code-string) !important; }
+pre.chroma .si { color: var(--code-string) !important; }
+pre.chroma .sx { color: var(--code-string) !important; }
+pre.chroma .sa { color: var(--code-string) !important; }
+pre.chroma .dl { color: var(--code-string) !important; }
+
+pre.chroma .c { color: var(--code-comment) !important; }
+pre.chroma .cm { color: var(--code-comment) !important; }
+pre.chroma .c1 { color: var(--code-comment) !important; }
+pre.chroma .cp { color: var(--code-comment) !important; }
+pre.chroma .cs { color: var(--code-comment) !important; }
+
+pre.chroma .m { color: var(--code-number) !important; }
+pre.chroma .mi { color: var(--code-number) !important; }
+pre.chroma .mf { color: var(--code-number) !important; }
+pre.chroma .mh { color: var(--code-number) !important; }
+pre.chroma .il { color: var(--code-number) !important; }
+
+pre.chroma .nb { color: var(--code-function) !important; }
+pre.chroma .nf { color: var(--code-function) !important; }
+
+pre.chroma .nc { color: var(--code-type) !important; }
+pre.chroma .nd { color: var(--code-type) !important; }
+pre.chroma .ne { color: var(--code-type) !important; }
+pre.chroma .nn { color: var(--code-type) !important; }
+
+pre.chroma .na { color: var(--code-variable) !important; }
+pre.chroma .nv { color: var(--code-variable) !important; }
+pre.chroma .vc { color: var(--code-variable) !important; }
+pre.chroma .vg { color: var(--code-variable) !important; }
+pre.chroma .vi { color: var(--code-variable) !important; }
+pre.chroma .no { color: var(--code-variable) !important; }
+
+pre.chroma .o { color: var(--text-primary) !important; }
+pre.chroma .ow { color: var(--text-primary) !important; }
+
+pre.chroma .p { color: var(--text-primary) !important; }
+pre.chroma .pi { color: var(--text-primary) !important; }
+
+/* Panels and wells */
+.well {
+  background-color: var(--well-bg) !important;
+  border: 1px solid var(--well-border) !important;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.panel {
+  background-color: var(--panel-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: 6px;
+}
+
+.panel-heading {
+  background-color: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.list-group-item {
+  background-color: var(--list-item-bg) !important;
+  border: 1px solid var(--border-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.2s ease;
+}
+
+.list-group-item:hover {
+  background-color: var(--list-item-hover) !important;
+}
+
+/* Navigation */
+.navbar {
+  background-color: var(--bg-primary) !important;
+  border-bottom: 1px solid var(--border-primary) !important;
+}
+
+.navbar-brand {
+  color: var(--text-primary) !important;
+}
+
+.navbar-nav > li > a {
+  color: var(--text-secondary) !important;
+}
+
+.navbar-nav > li > a:hover {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-hover) !important;
+}
+
+/* Ensure all navbar links use theme text colors */
+.navbar a {
+  color: var(--text-secondary) !important;
+}
+.navbar a:hover,
+.navbar a:focus {
+  color: var(--text-primary) !important;
+}
+
+/* Table of Contents (ToC) links: keep blue in light mode only */
+[data-theme="light"] .toc-container a,
+[data-theme="light"] nav#TableOfContents a {
+  color: var(--accent-primary) !important; /* blue */
+  text-decoration: none;
+}
+[data-theme="light"] .toc-container a:visited,
+[data-theme="light"] nav#TableOfContents a:visited {
+  color: var(--accent-primary) !important;
+}
+[data-theme="light"] .toc-container a:hover,
+[data-theme="light"] nav#TableOfContents a:hover,
+[data-theme="light"] .toc-container a:focus,
+[data-theme="light"] nav#TableOfContents a:focus {
+  color: var(--link-hover) !important; /* darker blue on hover */
+  text-decoration: underline;
+}
+
+/* Footer */
+footer {
+  background-color: var(--bg-secondary) !important;
+  border-top: 1px solid var(--border-primary) !important;
+  color: var(--text-secondary) !important;
+}
+/* Pager (prev/next) */
+.pager li a {
+  background: var(--panel-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-primary) !important;
+}
+.pager li a:hover,
+.pager li a:focus {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+.pager {
+  margin-top: 10px;
+}
+
+/* Social share badges */
+ul.share li a {
+  background-color: var(--border-secondary) !important;
+}
+ul.share li .fab {
+  color: var(--bg-primary) !important;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse !important;
+  background: var(--panel-bg) !important;
+  color: var(--text-primary) !important;
+}
+table tr {
+  border-top: 1px solid var(--border-primary) !important;
+  background-color: var(--panel-bg) !important;
+}
+table tr:nth-child(2n) {
+  background-color: var(--bg-secondary) !important;
+}
+table th, table td {
+  border: 1px solid var(--border-primary) !important;
+  padding: 8px 12px !important;
+}
+table th {
+  color: var(--text-primary) !important;
+}
+
+/* Post titles should use text color even when wrapped in anchors */
+.post-preview a,
+.post-preview a:visited {
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+.post-preview a:hover,
+.post-preview a:focus {
+  color: var(--text-primary) !important;
+  text-decoration: underline !important;
+}
+
+/* Headings wrapped by anchors (safety) */
+.post-title a,
+.post-subtitle a {
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+.post-title a:hover,
+.post-subtitle a:hover {
+  color: var(--text-primary) !important;
+}
+
+/* Meta and tag links on posts/lists should be dark, not blue */
+.post-meta a,
+.page-meta a,
+.post-heading .post-meta a,
+.post-preview .post-meta a,
+.blog-tags a {
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+.post-meta a:hover,
+.page-meta a:hover,
+.post-heading .post-meta a:hover,
+.post-preview .post-meta a:hover,
+.blog-tags a:hover {
+  color: var(--link-hover) !important;
+  text-decoration: underline !important;
+}
+
+footer a {
+  color: var(--text-secondary) !important;
+  transition: color 0.2s ease;
+}
+
+footer a:hover {
+  color: var(--link-primary) !important;
+}
+
+footer .copyright {
+  color: var(--text-secondary) !important;
+}
+
+footer .theme-by {
+  color: var(--text-tertiary) !important;
+}
+
+footer .disclaimer {
+  background-color: var(--well-bg) !important;
+  border: 1px solid var(--border-primary) !important;
+  border-left: 4px solid var(--accent-warning) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Social icons in footer */
+footer .fa-stack .fa-circle {
+  color: var(--text-secondary) !important;
+}
+
+footer .fa-stack .fa-inverse {
+  color: var(--bg-primary) !important;
+}
+
+/* Override the automatic dark mode media query */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+  }
+  
+  body:not([data-theme="light"]) a {
+    color: var(--link-primary) !important;
+  }
+  
+  body:not([data-theme="light"]) p a {
+    color: var(--link-primary) !important;
+  }
+  
+  body:not([data-theme="light"]) blockquote {
+    background-color: var(--blockquote-bg) !important;
+    border-left-color: var(--blockquote-border) !important;
+    color: var(--blockquote-text) !important;
+  }
+  
+  body:not([data-theme="light"]) code {
+    background-color: var(--code-bg) !important;
+    color: var(--code-text) !important;
+    border-color: var(--code-border) !important;
+  }
+  
+  body:not([data-theme="light"]) pre {
+    background-color: var(--code-bg) !important;
+    border-color: var(--code-border) !important;
+  }
+  
+  body:not([data-theme="light"]) pre code {
+    color: var(--code-text) !important;
+  }
+  
+  body:not([data-theme="light"]) .well {
+    background-color: var(--well-bg) !important;
+    border-color: var(--well-border) !important;
+  }
+  
+  body:not([data-theme="light"]) .panel {
+    background-color: var(--panel-bg) !important;
+    border-color: var(--panel-border) !important;
+  }
+  
+  body:not([data-theme="light"]) .list-group-item {
+    background-color: var(--list-item-bg) !important;
+    border-color: var(--border-primary) !important;
+    color: var(--text-primary) !important;
+  }
+  
+  body:not([data-theme="light"]) pre.chroma {
+    color: var(--code-text) !important;
+    background-color: var(--code-bg) !important;
+    border-color: var(--code-border) !important;
+  }
+}
+
+/* Theme toggle button in navbar */
+.navbar .theme-toggle {
+  margin-left: 10px;
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.navbar .theme-toggle:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-primary);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px var(--shadow-subtle);
+}
+
+/* Enhanced smooth transitions with better performance */
+* {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus styles for accessibility */
+*:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Improved button styles */
+button:focus,
+.theme-toggle:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Enhanced hover effects */
+a:hover,
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* Delayed Disqus / Show comments button theming */
+.disqus-comments button,
+#show-comments,
+.btn-show-comments {
+  background: var(--panel-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-primary) !important;
+}
+.disqus-comments button:hover,
+#show-comments:hover,
+.btn-show-comments:hover,
+.disqus-comments button:focus,
+#show-comments:focus,
+.btn-show-comments:focus {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .theme-toggle {
+    padding: 6px 10px;
+    font-size: 1.1em;
+  }
+  
+  .navbar .theme-toggle {
+    margin-left: 5px;
+  }
+}

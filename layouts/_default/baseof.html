@@ -1,0 +1,37 @@
+{{ if le hugo.Version "0.124.0" }}
+	{{ errorf "Please use Hugo version 0.124.0 or higher!" }}
+{{ end }}
+
+<!DOCTYPE html>
+<html lang="{{ .Lang }}" itemscope itemtype="http://schema.org/WebPage">
+  <head>
+    {{ partial "head.html" . }}
+    <!-- Theme Toggle CSS -->
+    <link rel="stylesheet" href="{{ "css/theme-toggle.css" | absURL }}" />
+    <!-- Dark Theme Options CSS removed (only Light + Warm Dark modes) -->
+    
+    <!-- Prevent FOUC (Flash of Unstyled Content) -->
+    <script>
+      (function() {
+        const savedTheme = localStorage.getItem('theme-preference');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Use saved theme or default to light (ignore system preference by default)
+        let theme = savedTheme || 'light';
+        
+        // Apply theme immediately to prevent FOUC
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+  </head>
+  <body>
+    {{ partial "nav.html" . }}
+    {{ block "header" . }}{{ partial "header.html" . }}{{ end }}
+    {{ block "main" . }}{{ end }}
+    {{ partial "footer.html" . }}
+    {{ block "footer" . }}{{ end }}
+    
+    <!-- Theme Toggle JavaScript -->
+    <script src="{{ "js/theme-toggle.js" | absURL }}"></script>
+  </body>
+</html>
