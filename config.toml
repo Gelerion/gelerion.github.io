@@ -5,26 +5,16 @@ author = "Denis Shuvalov"
 theme = 'beautifulhugo'
 description  = "Java, JVM performance, Streaming & AI engineering notes"
 keywords = [
-  "java",
-  "jvm",
-  "spring-boot",
-  "microservices",
-  "streaming",
-  "lakehouse",
-  "flink",
-  "kafka",
-  "trino",
-  "performance",
-  "ai",
-  "rag",
-  "openai",
-  "vector-databases",
-  "api-design",
-  "architecture",
+  "API design",
+  "REST",
+  "OpenTelemetry",
   "observability",
-  "terraform",
-  "kubernetes",
-  "design-docs"
+  "spark",
+  "data-sketches",
+  "streaming",
+  "analytics",
+  "maven",
+  "gpg"
 ]
 
 enableRobotsTXT = true 

@@ -4,6 +4,7 @@ title: "Template"
 date: 2025-05-04T15:04:05+03:00       # ISO8601 with timezone
 lastmod: 2025-05-04T16:00:00+03:00    # optional, if you update later
 draft: true                           # switch to true while drafting
+robots: "noindex, nofollow"           # prevent indexing of template page
 author: "Gelerion"
 summary: "Start with a brief overview: frame the problem you’re solving, why it matters, and what readers will learn."
 
@@ -16,9 +17,10 @@ slug: "template-guide"                   # overrides URL path
 # categories: ["Microservices","API"]       # higher-level grouping
 # tags: ["api-design","openapi","rest"]
 # series: "API Primer"                      # for multi-part posts
-categories: ["Teamplate"]       # higher-level grouping
-tags: ["tempalte"]
-series: "templates"
+# Keep taxonomy empty to avoid polluting indexes
+categories: []
+tags: []
+# series: ""
 
 # ─── Social / Media ──────────────────────────────────────────────────────────
 # images      = ["posts/api-design/cover.png"]# path under /static/
