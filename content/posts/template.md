@@ -54,11 +54,27 @@ openapi: 3.1.0
 info:
   title: Example API
   version: 1.0.0
-# …
+  description: "A sample API for testing syntax highlighting"
+servers:
+  - url: "https://api.example.com/v1"
+paths:
+  /widgets:
+    get:
+      summary: "List widgets"
+      responses:
+        '200':
+          description: "Successful response"
 ```
-  
+
 ### 2.2 Versioning Strategies
-…
+API versioning is crucial for maintaining backward compatibility.
+
+```http
+GET /v1/widgets HTTP/1.1
+Host: api.example.com
+Accept: application/json
+Authorization: Bearer your-token-here
+```
   
 ## 3. Implementation Patterns
 Pin down the concrete steps, code snippets, diagrams…
@@ -66,9 +82,71 @@ Pin down the concrete steps, code snippets, diagrams…
 ```java
 @RestController
 @RequestMapping("/v1/widgets")
+@Validated
 public class WidgetController {
-    // …
+    
+    private final WidgetService widgetService;
+    
+    @GetMapping
+    public ResponseEntity<List<Widget>> getAllWidgets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<Widget> widgets = widgetService.findAll(page, size);
+        return ResponseEntity.ok(widgets);
+    }
+    
+    @PostMapping
+    public ResponseEntity<Widget> createWidget(@Valid @RequestBody WidgetDto widgetDto) {
+        Widget widget = widgetService.create(widgetDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(widget);
+    }
 }
+```
+
+### 3.1 Error Handling
+
+```java
+@ExceptionHandler(WidgetNotFoundException.class)
+public ResponseEntity<ErrorResponse> handleWidgetNotFound(WidgetNotFoundException ex) {
+    ErrorResponse error = new ErrorResponse(
+        "WIDGET_NOT_FOUND", 
+        ex.getMessage(), 
+        LocalDateTime.now()
+    );
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+}
+```
+
+### 3.2 Configuration
+
+```properties
+# Application configuration
+server.port=8080
+spring.application.name=widget-api
+
+# Database configuration
+spring.datasource.url=jdbc:postgresql://localhost:5432/widgets
+spring.datasource.username=widget_user
+spring.datasource.password=${DB_PASSWORD:defaultPassword}
+
+# Logging
+logging.level.com.example.widgets=DEBUG
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+```
+
+### 3.3 Docker Configuration
+
+```dockerfile
+FROM openjdk:17-jdk-slim
+
+WORKDIR /app
+COPY target/widget-api-*.jar app.jar
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
   
 ## 4. Best Practices & Gotchas
