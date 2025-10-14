@@ -28,7 +28,6 @@ keywords: [
   "distributed tracing",
   "telemetry fundamentals"
 ]
-toc: true
 slug: "otel-foundations-part-1-what-is-a-signal"
 ---
 

@@ -103,7 +103,7 @@ With patterns for accessing collections established, we need to consider how use
 
 > **User Story:** As a shopper, I want to find products within a certain price range and filter them by brand and customer rating.
 
-### Design Challenge:
+### Design Challenge
 How can we enable powerful and flexible filtering especially when dealing with multiple criteria,
 ranges, and different data types, without making the API cumbersome to use or slow to respond?
 

@@ -919,3 +919,54 @@ button:hover {
     margin-left: 5px;
   }
 }
+
+/* Compact post list styles for /posts page */
+.post-item-compact {
+  margin-bottom: 0.8rem;
+  line-height: 1.4;
+  font-size: 1em;
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.post-date-compact {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  margin-right: 1.2rem;
+  flex-shrink: 0;
+  width: 100px;
+  text-align: left;
+}
+
+.post-title-compact {
+  color: var(--text-primary) !important;
+  text-decoration: underline !important;
+  transition: color 0.2s ease;
+  font-weight: normal;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-title-compact:hover,
+.post-title-compact:focus {
+  color: var(--link-hover) !important;
+  text-decoration: underline !important;
+}
+
+/* Responsive adjustments for compact list */
+@media (max-width: 768px) {
+  .post-item-compact {
+    font-size: 0.95em;
+    margin-bottom: 0.6rem;
+  }
+  
+  .post-date-compact {
+    width: 85px;
+    margin-right: 1rem;
+  }
+}
