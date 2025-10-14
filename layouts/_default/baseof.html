@@ -7,7 +7,7 @@
   <head>
     {{ partial "head.html" . }}
     <!-- Theme Toggle CSS -->
-    <link rel="stylesheet" href="{{ "css/theme-toggle.css" | absURL }}" />
+    <link rel="stylesheet" href="{{ (print ("css/theme-toggle.css?v=") (now.Unix)) | absURL }}" />
     
     <!-- Prevent FOUC (Flash of Unstyled Content) -->
     <script>

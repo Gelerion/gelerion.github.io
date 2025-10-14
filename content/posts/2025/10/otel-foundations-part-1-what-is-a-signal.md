@@ -39,17 +39,17 @@ Those objects are called **signals**, and there are three of them: **traces, met
 
 That’s it. Everything else — collectors, backends, fancy vendor UIs — is built on top of these building blocks. If you don’t understand signals, you’re just poking at pretty graphs without knowing what’s underneath.
 
-> Outcome: In this post we’ll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors. Just the SDK, creating and printing raw signals from your app.
+> **Outcome:** In this post we’ll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors. Just the SDK, creating and printing raw signals from your app.
 
 ---
 
 ## Signals at a Glance
 
-- Traces/Spans: request lifecycles and causality across services.
-- Metrics: periodic measurements and aggregations for trends and SLOs.
-- Logs: discrete, timestamped events with contextual details.
+- Traces/Spans: request lifecycles and causality across services
+- Metrics: periodic measurements and aggregations for trends and SLOs
+- Logs: discrete, timestamped events with contextual details
 
-These three signals form the foundation of observability. Let’s start with the one everything else depends on: spans.
+These three signals form the foundation of observability. Let's start with the one everything else depends on: spans.
 
 ---
 
@@ -61,11 +61,11 @@ What makes spans interesting is not just that they measure how long something to
 
 Under the hood, a span is just a structured object with a few key parts:
 
-* **Name** — the operation, like `GET /checkout`.
-* **TraceId + SpanId** — identifiers that connect spans into a trace.
-* **Attributes** — metadata describing the span, such as `http.method=GET`.
-* **Events** — timestamped markers that show what happened along the way.
-* **Status** — success or failure.
+* **Name** — the operation, like `GET /checkout`
+* **TraceId + SpanId** — identifiers that connect spans into a trace
+* **Attributes** — metadata describing the span, such as `http.method=GET`
+* **Events** — timestamped markers that show what happened along the way
+* **Status** — success or failure
 
 
 ### Example: Creating a Span in Java
@@ -109,10 +109,10 @@ When the span ends, you’ll see something like this:
 ```
 
 <details>
-<summary><strong>See full details and example output</strong></summary>
+<summary>See full details and example output</summary>
 
-This section expands to show the complete raw OTLP payload and a link to the example code in the demo project.  
-It’s useful if you want to inspect what OpenTelemetry actually sends under the hood.
+**Try it yourself:**  
+👉 
 
 **Full OTLP Example:**
 
@@ -187,23 +187,20 @@ It’s useful if you want to inspect what OpenTelemetry actually sends under the
 }
 ```
 
-**Try it yourself:**  
-👉 
-
 </details>
 
 ### Attributes vs. Events: Clearing the Confusion
 
-A common early question is: what’s the difference between attributes and events? On the surface they both look like “extra details,” but they capture very different kinds of information.
+A common early question is: what's the difference between attributes and events? On the surface they both look like "extra details," but they capture very different kinds of information.
 
-* **Attributes** describe what the span *is*. They’re metadata that applies for the whole duration: the HTTP method, the database system, or the user role. Once set, they don’t change.
-* **Events** describe what *happens* during the span. They’re timestamped points on the timeline — “controller started,” “query executed,” “cache miss.”
+* **Attributes** describe what the span *is* — metadata that applies for the whole duration: the HTTP method, the database system, or the user role. Once set, they don't change
+* **Events** describe what *happens* during the span — timestamped points on the timeline like "controller started," "query executed," "cache miss"
 
-The difference might sound subtle, but it’s critical:
+The difference might sound subtle, but it's critical:
 
-* Attributes make spans *searchable*. You can filter for “all error spans with `http.method=POST`.”
-* Events make spans *explainable*. They narrate what unfolded inside that request.
-* Attributes can explode your cardinality if you use unbounded values (`user.id`), while events are safe for high-churn data.
+* Attributes make spans *searchable* — you can filter for "all error spans with `http.method=POST`"
+* Events make spans *explainable* — they narrate what unfolded inside that request
+* Attributes can explode your cardinality if you use unbounded values (`user.id`), while events are safe for high-churn data
 
 **Mental model:** attributes are like columns in a database table; events are like rows in a log table.
 
@@ -226,16 +223,16 @@ If spans are the story of individual requests, metrics are the pulse of your who
 
 Metrics answer questions like:
 
-* How many requests per second are we handling?
-* What’s the distribution of request latencies?
-* How many jobs failed in the last 5 minutes?
+* How many requests per second are we handling
+* What's the distribution of request latencies
+* How many jobs failed in the last 5 minutes
 
 ### Example: Counters and Histograms
 
 OpenTelemetry defines several metric instruments, but in practice two are most important:
 
-* **Counter** — always increases. Good for counts: requests, errors, bytes sent.
-* **Histogram** — captures a distribution of values. Perfect for latency, payload sizes, or anything where the spread matters.
+* **Counter** — always increases; good for counts: requests, errors, bytes sent
+* **Histogram** — captures a distribution of values; perfect for latency, payload sizes, or anything where the spread matters
 
 ```java
 Meter meter = GlobalOpenTelemetry.getMeter("demo");
@@ -293,27 +290,27 @@ Choosing good bucket boundaries is one of the most common and subtle performance
 Too few buckets, and you lose visibility. Too many, and your metrics backend drowns in noise.
 
 <details>
-<summary><strong>Examples of bucket pitfalls</strong></summary>
+<summary>Examples of bucket pitfalls</summary>
 
-**Buckets too wide**  
-You pick only two boundaries: `1s` and `+Inf`.
+**Buckets too wide**:  You pick only two boundaries: `1s` and `+Inf`
 
-* A request that takes 20 ms goes into the `1s` bucket.
-* A request that takes 800 ms also goes into the same bucket.
-  Result: both “super fast” and “almost a second” look identical — you just learn “not slow.”
+* A request that takes 20 ms goes into the `1s` bucket
+* A request that takes 800 ms also goes into the same bucket
 
-**Buckets too narrow**  
-You define 100 tiny buckets: `1ms, 2ms, 3ms, …` up to `100ms`.
+Result: both "super fast" and "almost a second" look identical — you just learn "not slow"
 
-* Each request increments a different bucket.
-* Your dashboards are cluttered with dozens of near-empty series.
-  Result: memory overhead in Prometheus, noisy charts, and you still don’t get a clearer picture.
+**Buckets too narrow**: You define 100 tiny buckets: `1ms, 2ms, 3ms, …` up to `100ms`
 
-**Buckets misaligned**  
-You set boundaries at `100ms, 200ms, 300ms`, but your API actually runs around `2–3s`.
+* Each request increments a different bucket
+* Your dashboards are cluttered with dozens of near-empty series
 
-* Every request ends up in the `+Inf` bucket.
-  Result: you only know “everything is too slow,” but you can’t tell if it’s consistently 2s or spiking to 20s.
+Result: memory overhead in Prometheus, noisy charts, and you still don't get a clearer picture
+
+**Buckets misaligned**: You set boundaries at `100ms, 200ms, 300ms`, but your API actually runs around `2–3s`
+
+* Every request ends up in the `+Inf` bucket
+
+Result: you only know "everything is too slow," but you can't tell if it's consistently 2s or spiking to 20s
 
 </details>
 
@@ -335,11 +332,11 @@ Best practice: keep attributes bounded (HTTP method, status code) and avoid unbo
 
 ### Why Metrics Matter
 
-Spans are great for debugging a single request, but metrics let you spot system-wide trends.
+Spans are great for debugging a single request, but metrics let you spot system-wide trends:
 
-* Counters show traffic surges.
-* Histograms reveal creeping latency problems.
-* Percentiles highlight unhappy outliers.
+* Counters show traffic surges
+* Histograms reveal creeping latency problems
+* Percentiles highlight unhappy outliers
 
 Without metrics, you might not notice your service gradually degrading until users start complaining. 
 With metrics, you can catch the trend early and prove SLO compliance ("99.9% of requests complete in under 500ms").
@@ -439,9 +436,9 @@ It contains the version, trace ID, parent span ID, and trace flags. When Service
 
 The result is a connected view:
 
-* From a failing span, you can jump to the logs that explain the error.
-* From a latency spike in metrics, you can jump into traces showing where the slowdown happened.
-* From a suspicious log, you can trace it back to the exact request.
+* From a failing span, you can jump to the logs that explain the error
+* From a latency spike in metrics, you can jump into traces showing where the slowdown happened
+* From a suspicious log, you can trace it back to the exact request
 
 This context is what transforms piles of disconnected data into observability.
 
@@ -450,10 +447,10 @@ This context is what transforms piles of disconnected data into observability.
 
 Imagine this scenario:
 
-1. Your dashboard shows **p95 latency spiking** from 200ms to 3s (metrics signal).
-2. You drill into traces and find several slow spans for `POST /checkout` (trace signal).
-3. Inside one span, you see an event: "inventory.check took 2.8s".
-4. You jump to logs filtered by that span's trace ID and find: `ERROR: inventory service timeout after 2.8s` (log signal).
+1. Your dashboard shows **p95 latency spiking** from 200ms to 3s (metrics signal)
+2. You drill into traces and find several slow spans for `POST /checkout` (trace signal)
+3. Inside one span, you see an event: "inventory.check took 2.8s"
+4. You jump to logs filtered by that span's trace ID and find: `ERROR: inventory service timeout after 2.8s` (log signal)
 
 Without unified context, you'd be jumping between three different tools, manually correlating timestamps. With OTel, it's one click.
 
@@ -480,19 +477,17 @@ In practice, you'll use all three together. Metrics alert you to problems, trace
 
 Before we wrap up, here are the mistakes I see most often:
 
-1. **Unbounded Attributes:** Don't add `user.id` to metrics labels (cardinality explosion). Use events in spans instead, or use metrics with pre-aggregation.
+1. **Unbounded Attributes:** Don't add `user.id` to metrics labels (cardinality explosion) — use events in spans instead, or use metrics with pre-aggregation
 
-2. **Forgetting `span.end()`:** Leads to memory leaks and incomplete traces. Always use try-finally or try-with-resources.
+2. **Forgetting `span.end()`:** Leads to memory leaks and incomplete traces — always use try-finally or try-with-resources
 
-3. **Averaging Latency:** Use histograms and percentiles, not `mean()`. Averages hide outliers.
+3. **Averaging Latency:** Use histograms and percentiles, not `mean()` — averages hide outliers
 
-4. **Wrong Bucket Boundaries:** Test with real traffic patterns before settling on histogram buckets. Too wide or too narrow both cause problems.
+4. **Wrong Bucket Boundaries:** Test with real traffic patterns before settling on histogram buckets — too wide or too narrow both cause problems
 
-5. **Logging Without Correlation:** Always propagate trace context to logs, either via OTel bridges or manual extraction. Logs without trace IDs are much harder to debug.
+5. **Logging Without Correlation:** Always propagate trace context to logs, either via OTel bridges or manual extraction — logs without trace IDs are much harder to debug
 
-6. **Over-instrumenting:** Don't create a span for every function call. Focus on meaningful units of work: HTTP requests, database queries, external API calls.
-
-7. **Ignoring Sampling:** In high-throughput systems, trace every request and you'll overwhelm your backend. Plan for sampling from day one.
+6. **Over-instrumenting:** Don't create a span for every function call — focus on meaningful units of work: HTTP requests, database queries, external API calls
 
 ---
 

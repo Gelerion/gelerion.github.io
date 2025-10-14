@@ -271,6 +271,23 @@ pre:not(.chroma) code {
   color: var(--code-text) !important;
 }
 
+/* Remove focus ring and tab focusability on code blocks */
+.highlight pre,
+.highlight code {
+  outline: none !important;
+}
+.highlight pre:focus,
+.highlight code:focus {
+  outline: none !important;
+}
+
+/* Prevent pointer/keyboard interaction on anchors inside code */
+.highlight a {
+  pointer-events: none !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
 /* Avoid double wrapping borders for Chroma output */
 .highlight pre.chroma,
 .highlight .chroma {
@@ -969,4 +986,129 @@ button:hover {
     width: 85px;
     margin-right: 1rem;
   }
+}
+
+/* Fix ToC scroll offset to account for header */
+:target {
+  scroll-margin-top: 100px;
+}
+
+/* Alternative approach using scroll-padding on html */
+html {
+  scroll-padding-top: 100px;
+}
+
+/* Details/Summary styling for better UX */
+details {
+  background-color: var(--well-bg);
+  border: 1px solid var(--border-primary);
+  border-left: 4px solid var(--accent-primary);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1.5rem 0;
+  transition: all 0.3s ease;
+  font-weight: 400; /* ensure regular text inside details */
+}
+
+details:hover {
+  border-left-color: var(--accent-secondary);
+  box-shadow: 0 2px 8px var(--shadow-subtle);
+}
+
+details[open] {
+  background-color: var(--bg-secondary);
+  border-left-color: var(--accent-success);
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 400; /* regular font for summary title */
+  color: var(--text-primary);
+  padding: 0.5rem 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+/* If summary markup uses <strong>, keep it regular */
+summary strong,
+summary b {
+  font-weight: inherit;
+}
+
+summary:hover {
+  color: var(--accent-primary);
+}
+
+summary:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Add arrow indicator */
+summary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.3s ease;
+  color: var(--accent-primary);
+  font-size: 0.8em;
+}
+
+details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+/* Remove default marker in webkit browsers */
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Content inside details with proper spacing */
+details > *:not(summary) {
+  margin-top: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Robust anchor offset for fixed header (works across browsers) */
+:root {
+  --anchor-offset: 100px;
+}
+
+/* Prefer scroll-margin when supported */
+h1[id],
+h2[id],
+h3[id],
+h4[id],
+h5[id],
+h6[id] {
+  scroll-margin-top: var(--anchor-offset);
+}
+
+/* Fallback using ::before spacer for older engines */
+h1[id]::before,
+h2[id]::before,
+h3[id]::before,
+h4[id]::before,
+h5[id]::before,
+h6[id]::before {
+  content: "";
+  display: block;
+  height: var(--anchor-offset);
+  margin-top: calc(var(--anchor-offset) * -1);
+  visibility: hidden;
 }
