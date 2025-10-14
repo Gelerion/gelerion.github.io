@@ -4,10 +4,10 @@ date: 2025-10-13T08:00:00+03:00
 lastmod: 2025-10-13T08:00:00+03:00
 author: "Gelerion"
 series: [ "OpenTelemetry Foundations" ]
-draft: true
+draft: false
 categories: [ "Observability", "Software Engineering" ]
-summary: "Start at ground zero: spans, metrics, and logs as structured signals, with a light intro to histograms and a teaser on cardinality."
-description: "Part 1 of OpenTelemetry Foundations explores spans, metrics, and logs as structured signals, introduces histograms, and hints at cardinality considerations you should keep in mind."
+summary: "OpenTelemetry isn't magic—it's just structured data objects. Part 1 demystifies OTel signals: spans for request timelines, metrics for trends and SLOs, logs for context. Learn about attributes vs events, histogram buckets, cardinality traps, and the unified context that ties it all together."
+description: "OpenTelemetry isn't magic—it's just structured data objects. Part 1 demystifies OTel signals: spans for request timelines, metrics for trends and SLOs, logs for context. Learn about attributes vs events, histogram buckets, cardinality traps, and the unified context that ties it all together."
 tags: [
   "OpenTelemetry",
   "OTel",
@@ -39,7 +39,12 @@ Those objects are called **signals**, and there are three of them: **traces, met
 
 That’s it. Everything else — collectors, backends, fancy vendor UIs — is built on top of these building blocks. If you don’t understand signals, you’re just poking at pretty graphs without knowing what’s underneath.
 
-> **Outcome:** In this post we’ll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors. Just the SDK, creating and printing raw signals from your app.
+> **Outcome:** In this post we'll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors. Just the SDK, creating and printing raw signals from your app.
+
+---
+
+> 💡 **Prefer hands-on learning?** All examples in this post come from a working Java project with manual instrumentation, semantic conventions, and best practices baked in. Clone it, run it, and explore OpenTelemetry without the magic:  
+> 👉 [OTel Playground on GitHub](https://github.com/Gelerion/otel-playground)
 
 ---
 
@@ -112,7 +117,7 @@ When the span ends, you’ll see something like this:
 <summary>See full details and example output</summary>
 
 **Try it yourself:**  
-👉 
+👉 [Otel-Playground Repository](https://github.com/Gelerion/otel-playground/blob/blog-exmaples/src/main/java/com/gelerion/otel/playground/examples/SpanExample.java)
 
 **Full OTLP Example:**
 
@@ -392,11 +397,58 @@ Conceptually printed:
 
 It’s worth repeating: OpenTelemetry does not replace your logger. You’ll still write `logger.info("...")` as always. The difference is that with an OTel appender or bridge, those logs can carry structure and correlation data automatically.
 
-In production, you configure something like a `Log4j2OtelAppender`, so your existing logs get enriched with trace IDs without rewriting everything.
+<details>
+<summary>Example log4j2.xml configuration</summary>
 
-<details> <summary><strong>Example configuration</strong></summary>
-A Log4j2OtelAppender snippet showing how to enrich log records with OTel context automatically.
-link: []
+**Try it yourself:**  
+👉 [Otel-Playground Repository](https://github.com/Gelerion/otel-playground/tree/main)
+
+This configuration shows how to integrate OpenTelemetry logging with Log4j2. The key components:
+
+
+- OpenTelemetryAppender: Captures context data and sends logs to the OTel Collector
+- Context capture settings: Automatically includes trace/span IDs in log records
+
+**Full configuration:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration
+        status="WARN"
+        xmlns="https://logging.apache.org/xml/ns"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://logging.apache.org/xml/ns https://logging.apache.org/xml/ns/log4j-config-2.xsd">
+
+    <Appenders>
+        <!-- Console output with JSON formatting for better parsing -->
+        <Console name="CONSOLE">
+            <JsonTemplateLayout/>
+        </Console>
+        
+        <!-- OpenTelemetry appender: captures context and sends to Collector -->
+        <OpenTelemetry name="OpenTelemetryAppender"
+                       captureContextDataAttributes="*"
+                       captureMapMessageAttributes="true"
+                       captureMarkerAttribute="true"
+                       captureCodeAttributes="true"/>
+    </Appenders>
+
+    <Loggers>
+        <!-- Application-specific logger with both console and OTel output -->
+        <Logger name="com.gelerion" level="INFO" additivity="false">
+            <AppenderRef ref="CONSOLE"/>
+            <AppenderRef ref="OpenTelemetryAppender"/>
+        </Logger>
+        
+        <!-- Root logger for all other components -->
+        <Root level="WARN">
+            <AppenderRef ref="CONSOLE"/>
+            <AppenderRef ref="OpenTelemetryAppender"/>
+        </Root>
+    </Loggers>
+
+</Configuration>
+```
+
 </details>
 
 ### Manual Correlation Without OTel Logging
@@ -427,12 +479,17 @@ Spans, metrics, and logs are valuable on their own, but the real power comes fro
 
 When you start a span, OTel creates a context containing a TraceId and SpanId. While that span is active, any metrics you record or logs you emit can carry the same IDs. Across services, the `traceparent` header (defined by the W3C Trace Context specification) propagates that context.
 
+<details>
+<summary>The `traceparent` header example</summary>
+
 The `traceparent` header looks like this:
 ```
 traceparent: 00-4f9c0b9a2b8b4f6ea4c1d8c7e3f2a1b0-a1b2c3d4e5f67890-01
 ```
 
 It contains the version, trace ID, parent span ID, and trace flags. When Service A calls Service B, this header travels along, allowing Service B to create child spans that belong to the same trace.
+
+</details>
 
 The result is a connected view:
 
@@ -442,17 +499,19 @@ The result is a connected view:
 
 This context is what transforms piles of disconnected data into observability.
 
-
-### Example: Following the Context
+<details>
+<summary>Example: Following the Context</summary>
 
 Imagine this scenario:
 
 1. Your dashboard shows **p95 latency spiking** from 200ms to 3s (metrics signal)
 2. You drill into traces and find several slow spans for `POST /checkout` (trace signal)
-3. Inside one span, you see an event: "inventory.check took 2.8s"
+3. Inside one span, you see a child span: `inventory.check` that took 2.8s
 4. You jump to logs filtered by that span's trace ID and find: `ERROR: inventory service timeout after 2.8s` (log signal)
 
-Without unified context, you'd be jumping between three different tools, manually correlating timestamps. With OTel, it's one click.
+Without unified context, you'd be jumping between three different tools, manually correlating timestamps and request IDs. With OTel providing correlation, your observability backend can link these signals directly — what took minutes of manual correlation now takes seconds.
+
+</details>
 
 ---
 
@@ -493,8 +552,17 @@ Before we wrap up, here are the mistakes I see most often:
 
 ## Wrapping Up
 
-That’s OpenTelemetry at its most stripped-down: spans, metrics, and logs, plus the context that stitches them into a single narrative.
+That's OpenTelemetry at its most stripped-down: **spans, metrics, and logs**, plus the **context** that stitches them into a single narrative.
 
-Once you see signals this way, dashboards stop looking like magic. They’re just visualizations of structured data your app is already producing.
+Once you see signals this way, dashboards stop looking like magic. They're just visualizations of structured data your app is already producing.
 
-In the next part, we’ll look at how these signals leave your application, flow through the Collector, and end up in backends like Prometheus, Tempo, and Loki. That’s where the real pipelines begin.
+But we've only scratched the surface. Now that you understand what signals *are*, the real questions begin:
+
+* How do these signals leave your application and reach your observability backend?
+* Where should the Collector run — as a sidecar, daemon, or gateway?
+* How do you handle advanced correlation patterns like exemplars and span links?
+* What sampling strategies keep signal while cutting noise?
+* How does OTel integrate with existing frameworks like Spring Boot and Micrometer?
+* What practices separate noisy telemetry from production-grade instrumentation?
+
+This series will answer all of these. **Part 2** starts with the journey from code to collector — how signals are exported, batched, and routed to their final destinations.
