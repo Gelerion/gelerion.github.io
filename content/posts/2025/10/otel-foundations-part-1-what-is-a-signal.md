@@ -33,7 +33,7 @@ slug: "otel-foundations-part-1-what-is-a-signal"
 
 ## Back to Basics — What Is an OTel Signal?
 
-When people hear about OpenTelemetry (OTel), they often think of dashboards: flame graphs, service maps, latency charts. But OTel itself isn’t a dashboard, and it’s not “observability” in the marketing sense either. At its core, OpenTelemetry is simply a way for your code to produce **structured data objects** about what it’s doing.
+When people hear about OpenTelemetry (OTel), they often think of dashboards: latency charts, flame graphs, service maps. But OTel itself isn’t a dashboard, and it’s not “observability” in the marketing sense either. At its core, OpenTelemetry is simply a way for your code to produce **structured data objects** about what it’s doing.
 
 Those objects are called **signals**, and there are three of them: **traces, metrics, and logs**.
 
@@ -43,7 +43,7 @@ That’s it. Everything else — collectors, backends, fancy vendor UIs — is b
 
 ---
 
-> 💡 **Prefer hands-on learning?** All examples in this post come from a working Java project with manual instrumentation, semantic conventions, and best practices baked in. Clone it, run it, and explore OpenTelemetry without the magic:  
+> 💡 **Prefer hands-on learning?** All examples in this post come from a working Java project with manual instrumentation, and best practices baked in. Clone it, run it, and explore OpenTelemetry without the magic:  
 > 👉 [OTel Playground on GitHub](https://github.com/Gelerion/otel-playground)
 
 ---
@@ -200,12 +200,6 @@ A common early question is: what's the difference between attributes and events?
 
 * **Attributes** describe what the span *is* — metadata that applies for the whole duration: the HTTP method, the database system, or the user role. Once set, they don't change
 * **Events** describe what *happens* during the span — timestamped points on the timeline like "controller started," "query executed," "cache miss"
-
-The difference might sound subtle, but it's critical:
-
-* Attributes make spans *searchable* — you can filter for "all error spans with `http.method=POST`"
-* Events make spans *explainable* — they narrate what unfolded inside that request
-* Attributes can explode your cardinality if you use unbounded values (`user.id`), while events are safe for high-churn data
 
 **Mental model:** attributes are like columns in a database table; events are like rows in a log table.
 
@@ -401,15 +395,13 @@ It’s worth repeating: OpenTelemetry does not replace your logger. You’ll sti
 <summary>Example log4j2.xml configuration</summary>
 
 **Try it yourself:**  
-👉 [Otel-Playground Repository](https://github.com/Gelerion/otel-playground/tree/main)
+👉 [Otel-Playground Repository](https://github.com/Gelerion/otel-playground/blob/main/src/main/resources/log4j2.xml)
 
-This configuration shows how to integrate OpenTelemetry logging with Log4j2. The key components:
-
-
+**Full configuration:**  
+This configuration shows how to integrate OpenTelemetry logging with Log4j2. The key components:  
 - OpenTelemetryAppender: Captures context data and sends logs to the OTel Collector
 - Context capture settings: Automatically includes trace/span IDs in log records
-
-**Full configuration:**
+  
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration
