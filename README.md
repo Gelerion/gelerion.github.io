@@ -5,7 +5,7 @@ This is a personal tech blog built with Hugo using the BeautifulHugo theme.
 ## Prerequisites
 
 * Git
-* [Hugo](https://gohugo.io/getting-started/installing/) (v0.80+ recommended)  
+* [Hugo](https://gohugo.io/getting-started/installing/) (v0.169.0+ required; the theme itself needs v0.146.2+, and CI builds with v0.169.0)  
 * (Optional) Homebrew (on macOS) or your favorite package manager
 
 ## Installation
@@ -30,7 +30,7 @@ This is a personal tech blog built with Hugo using the BeautifulHugo theme.
 
 ## Theme
 
-This site uses the `beautifulhugo` theme located in `themes/beautifulhugo`. Theme settings live in `config.toml` under the `theme` and `[params]` sections.
+This site uses the `beautifulhugo` theme (v5.2.0, git submodule) located in `themes/beautifulhugo`. Site-specific styling lives in `assets/css/custom.css` and is loaded via `layouts/_partials/head_custom.html`; dark mode is the theme's own (`colorScheme` param). Theme settings live in `config.toml` under the `theme` and `[params]` sections.
 
 ## Adding Content
 

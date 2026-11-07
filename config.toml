@@ -1,7 +1,6 @@
 baseURL = 'https://gelerion.github.io/'
-languageCode = 'en-us'
+locale = 'en-us'
 title = 'Gelerion Blog'
-author = "Denis Shuvalov"
 theme = 'beautifulhugo'
 description  = "Java, JVM performance, Streaming & AI engineering notes"
 keywords = [
@@ -24,11 +23,14 @@ summaryLength = 70
 # Shown in the side menu
 copyright = "&copy; Denis Shuvalov. All rights reserved."
 canonifyurls = true
-googleAnalytics = "G-962FFPME5F"
 
-[indexes]
-  tag = "tags"
-  topic = "topics"
+[module.hugoVersion]
+  min = "0.169.0"
+
+# With enableGitInfo, ":git" makes .Lastmod the commit date of the file
+[frontmatter]
+  lastmod = [":git", "lastmod", "date"]
+
 
 [params]
   subtitle = ""
@@ -36,7 +38,9 @@ googleAnalytics = "G-962FFPME5F"
   disqus = "Gelerion"
   dateFormat = "02 Jan 2006"
   favicon = "favicon.ico"
-  
+  mainSections = ["posts"]
+  colorScheme = "auto"   # "light" | "dark" | "auto"; v5 ships its own toggle
+
   comments = true
   readingTime = true
   wordCount = true
@@ -45,8 +49,8 @@ googleAnalytics = "G-962FFPME5F"
   delayDisqus = true
   showRelatedPosts = true
 
-[params.plausible]
-  domain = "gelerion.github.io"
+  [params.search]
+    provider = "fuse"   # navbar search overlay, backed by the home page JSON output
 
 [related]
   threshold = 80 # Lower score means more matches (default 80)
@@ -66,9 +70,9 @@ googleAnalytics = "G-962FFPME5F"
 [pagination]
   pagerSize = 10
  
-[Author]
+[params.author]
   # Set only your "username" for default hosts and full URLs otherwise (e.g., "https://MyGitLab.org/username")
-  #name = "Gelerion"
+  name = "Denis Shuvalov"
   website = "https://gelerion.github.io/"
   #email = "youremail@domain.com"
   github = "Gelerion"
@@ -125,12 +129,16 @@ googleAnalytics = "G-962FFPME5F"
     endLevel   = 3
     ordered = false
   [markup.goldmark]
+    [markup.goldmark.parser]
+      wrapStandAloneImageWithinParagraph = false   # lets the theme's image render hook see ![]() attributes
     [markup.goldmark.renderer]
       unsafe = true
       
 [services]
   [services.disqus]
     shortname = "Gelerion"
+  [services.googleAnalytics]
+    id = "G-962FFPME5F"
 
 [outputs]
   home    = ["HTML", "RSS", "JSON"]   # RSS for readers, JSON for search
@@ -143,10 +151,6 @@ googleAnalytics = "G-962FFPME5F"
 
 [minify]
   disableXML = true         
-
-[asset]                     
-  [asset.postCSS]
-    includeFiles = ["css/**/*.css"]
 
 [development]
   buildDrafts = true

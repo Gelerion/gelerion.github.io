@@ -1,0 +1,137 @@
+/* Site-level tweaks on top of Beautiful Hugo v5.
+   Loaded from layouts/_partials/head_custom.html. */
+
+/* Warm dark palette: re-maps the theme's dark-mode variables (see the
+   theme's assets/css/dark.css). Dark mode itself is the theme's own. */
+[data-theme="dark"] {
+  --dark-bg: #1a1a1a;
+  --dark-fg: #f5f5dc;
+  --dark-link: #d4af37;
+  --dark-navbar-bg: #2d2d2d;
+  --dark-navbar-border: #4a4a4a;
+  --dark-navbar-text: #d4c5a0;
+  --dark-navbar-hover: #e6c547;
+  --dark-surface: #3a3a3a;
+  --dark-surface-hover: #4a4a4a;
+  --dark-surface-active: #4a4a4a;
+  --dark-muted: #b8a082;
+  --dark-accent: #d4af37;
+  --dark-code-bg: #2d2d2d;
+  --dark-code-block-bg: #2d2d2d;
+  --dark-code-block-fg: #f5f5dc;
+  --dark-card-bg: #2d2d2d;
+  --dark-list-bg: #2d2d2d;
+}
+
+/* The theme's default blockquote text is too dim on the warm dark background */
+[data-theme="dark"] blockquote {
+  color: #d4c5a0;
+  border-left-color: var(--dark-accent);
+}
+
+/* Compact post list on /posts/ (layouts/posts/list.html) */
+.post-item-compact {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 0.8rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.post-date-compact {
+  flex-shrink: 0;
+  width: 100px;
+  margin-right: 1.2rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+[data-theme="dark"] .post-date-compact {
+  color: var(--dark-muted);
+}
+
+.post-title-compact {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .post-item-compact {
+    font-size: 0.95em;
+    margin-bottom: 0.6rem;
+  }
+
+  .post-date-compact {
+    width: 85px;
+    margin-right: 1rem;
+  }
+}
+
+/* Keep in-page anchors (ToC links) clear of the fixed navbar */
+h1[id], h2[id], h3[id], h4[id], h5[id], h6[id], :target {
+  scroll-margin-top: 100px;
+}
+
+/* <details> blocks used in posts */
+details {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+}
+
+details:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] details {
+  background-color: var(--dark-card-bg);
+  border-color: var(--dark-surface);
+  border-left-color: var(--dark-accent);
+}
+
+summary {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-weight: 400;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+summary strong,
+summary b {
+  font-weight: inherit;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.8em;
+  color: #3b82f6;
+  transition: transform 0.3s ease;
+}
+
+[data-theme="dark"] summary::before {
+  color: var(--dark-accent);
+}
+
+details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+details > *:not(summary) {
+  margin-top: 1rem;
+}
