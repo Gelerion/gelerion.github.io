@@ -92,12 +92,14 @@ hoping it remembers to call them. Models focused on completing a task often fail
 rarely search past sessions when they don't know relevant history exists. Conversely, pausing the user's session after
 every tool call so another model can summarize what happened adds unnecessary latency.
 
-A more reliable pattern moves memory orchestration out of the model's tool belt and into the application runtime
-wrapping the agent loop. As the agent works, the runtime publishes execution events, processes them into structured
-memories in the background, and queries those memories dynamically as each turn unfolds. To do this effectively, the 
-runtime doesn't treat memory as a single bucket of context. Instead, an operational agent relies on four distinct 
-types of memory—three persistent stores that accumulate knowledge over time, and one ephemeral context assembled 
-on the fly:
+A more reliable pattern moves memory orchestration out of the model's tool belt and into the application runtime 
+wrapping the agent loop. The runtime takes responsibility for capturing execution history, maintaining persistent 
+knowledge, and retrieving relevant context as a task unfolds.
+
+But memory isn't a single store of conversation history. An operational agent needs several kinds of information: 
+records of what happened, knowledge that remains useful across sessions, reusable procedures, and the immediate context 
+required for its next decision. These map to four distinct types of memory that accumulate knowledge over time, 
+and one ephemeral context assembled on the fly:
 
 ```text
                      APPLICATION RUNTIME
@@ -106,20 +108,21 @@ on the fly:
   |  [ Active Request + Live Tool Outputs + Recalled Memory ] |
   +-----------------------------------------------------------+
                  |                             ^
-     Async Write | (Execution                  | Dynamic Read
-     Path        |  Events)                    | Path
+                 |  Execution                  | Targeted
+                 |  Events                     | Recall
                  v                             |
   +-----------------------------------------------------------+
-  |                PERSISTENT STORES (Database)               |
+  |                     PERSISTENT MEMORY                     |
   |                                                           |
   |  +-----------------+  +---------------+  +-------------+  |
   |  | EPISODIC        |  | SEMANTIC      |  | PROCEDURAL  |  |
-  |  | Past events &   |->| Standing facts|  | Playbooks & |  |
+  |  | Past events &   |->| Standing facts|->| Playbooks & |  |
   |  | session outcomes|  | & constraints |  | workflows   |  |
   |  +-----------------+  +---------------+  +-------------+  |
   +-----------------------------------------------------------+
 ```
-  
+
+Each type serves a different purpose:
 * **Episodic Memory (What happened):** Concrete records of past activities, observations, and outcomes across sessions.
 * **Semantic Memory (What we know):** Standing facts, rules, preferences, and constraints that remain true beyond a
   single episode.
@@ -128,11 +131,11 @@ on the fly:
 * **Working Memory (What matters right now):** The compact, token-bounded context assembled for a single model call,
   combining the active user request, live tool outputs, and recalled long-term memories.
 
-Episodic, semantic, and procedural memories persist across sessions. Working memory is ephemeral: the runtime rebuilds
-it on every turn as the task progresses.
+The first three persist across sessions, though they don't all come from the same place: episodes and semantic rules are 
+usually extracted from live runtime events, while procedures are often written or curated by engineers. Working memory 
+is the exception—it only exists for a single turn and gets rebuilt from scratch on the next.
 
-Tracing the `CostGuard` incident through this architecture shows how raw events become persistent memories on the 
-write path—and how they return to working memory on the read path:
+Here's how the four memory types apply to the `CostGuard` example:
 
 ```text
 AGENT-OBSERVED EVENTS (Captured live during execution)
@@ -155,10 +158,6 @@ WORKING MEMORY (Recalled on next Friday's run)
            | Candidate: gpu-bench-01 (0.2% CPU)
            | Active Constraint: Keep gpu-bench-01 running (QA suite)
 ```
-
-The pipeline groups relevant events into episodes: one capturing the cleanup and its outcome, another recording the
-recovery and the engineer's explanation. From that feedback, the memory pipeline extracts a standing constraint that
-future sessions can enforce.
 
 ### Writing Memories
 
