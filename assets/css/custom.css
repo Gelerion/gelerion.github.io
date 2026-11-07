@@ -93,7 +93,6 @@ details:hover {
 [data-theme="dark"] details {
   background-color: var(--dark-card-bg);
   border-color: var(--dark-surface);
-  border-left-color: var(--dark-accent);
 }
 
 summary {
@@ -134,4 +133,44 @@ details[open] summary::before {
 
 details > *:not(summary) {
   margin-top: 1rem;
+}
+
+/* Center ```text blocks (ASCII diagrams). The box stays full width; the
+   content is centered inside it, and auto margins fall back to left-aligned
+   scrolling when the diagram is wider than the box (e.g. on phones). */
+.highlight pre:has(> code[data-lang="text"]) > code {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Tables span the full text width instead of shrinking to their content,
+   so every table in a post lines up with the paragraphs around it. */
+.blog-post table {
+  width: 100%;
+}
+
+/* Breathing room above and below tables */
+.blog-post table {
+  margin: 1.5rem 0;
+}
+
+/* Code blocks: the theme's syntax background is white (same as the page) and
+   unbordered, so blocks blend into the text. Give them a card look, matching
+   the <details> styling above. */
+.blog-post .highlight {
+  margin: 1.5rem 0;
+}
+
+.blog-post .highlight > pre {
+  background-color: #f6f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+[data-theme="dark"] .blog-post .highlight > pre {
+  background-color: var(--dark-code-block-bg);
+  border-color: var(--dark-surface);
 }
