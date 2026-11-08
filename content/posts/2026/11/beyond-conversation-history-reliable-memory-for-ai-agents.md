@@ -180,20 +180,20 @@ operation, even when downstream consequences only become clear in a later sessio
 Separating raw runtime events from consolidated episodes gives each record a clear job and a lean, domain-agnostic
 schema.
 
-A **Runtime Event** is a single, point-in-time record written when something happens: a tool completes, a user provides
-feedback, or an activity finishes. Events are append-only and fast to write. We don't inject raw events straight into
+A **Runtime Event** is a single, point-in-time record written when something happens: a tool completes, a user sends a
+message, or an activity finishes. Events are append-only and fast to write. We don't inject raw events straight into
 future prompts because a single task might generate dozens of intermediate observations and retries.
 
 | Field | Purpose |
 | --- | --- |
 | `event_id`, `timestamp` | Identify the event and when it happened |
 | `activity_id` | Groups events belonging to the same activity or execution attempt |
-| `event_type` | What happened, such as `tool.completed`, `activity.completed`, or `feedback.received` |
+| `event_type` | What happened, such as `tool.completed`, `activity.completed`, or `user.message` |
 | `scope` | Tenant, workspace, or other access boundary |
 | `entities` | Stable identifiers of resources or records involved |
 | `actor` | Agent, user, or component responsible for the event |
 | `evidence_ref` | Reference to the original trace, message, or tool result |
-| `data` | Event-specific payload, such as tool arguments, results, or user feedback |
+| `data` | Event-specific payload, such as tool arguments, results, or the user's message |
 
 An **Episode** is a compact, searchable record of a meaningful experience. Built from related events, it captures what
 happened, the observed execution status, and how the activity was resolved, if known.
@@ -218,7 +218,7 @@ evidence when more detail is needed.
 
 Because the background processor waits for checkpoints rather than summarizing every event as it arrives, it can
 evaluate an operation as a whole. A completed activity is an obvious checkpoint; others include a failed operation,
-explicit user feedback, or a long-running task reaching an intermediate milestone. An unfinished debugging session, for
+a user correction, or a long-running task reaching an intermediate milestone. An unfinished debugging session, for
 example, may still contain useful context even without a final outcome.
 
 A checkpoint triggers evaluation, but doesn't guarantee that a new episode will be created. Routine read-only checks can
@@ -239,7 +239,7 @@ As the agent inspects and stops the instance, the runtime captures three events 
 
 ```java
 # CostGuard inspects gpu-bench-01
-publish_runtime_event(
+publish_event(
     activity_id="act_1042",
     event_type="tool.completed",
     entities=["cloud-instance:i-09a8f"],
@@ -253,7 +253,7 @@ publish_runtime_event(
 )
 
 # CostGuard stops the instance
-publish_runtime_event(
+publish_event(
     activity_id="act_1042",
     event_type="tool.completed",
     entities=["cloud-instance:i-09a8f"],
@@ -262,7 +262,7 @@ publish_runtime_event(
 )
 
 # Resource cleanup finishes, triggering a checkpoint
-publish_runtime_event(
+publish_event(
     activity_id="act_1042",
     event_type="activity.completed",
     entities=["cloud-instance:i-09a8f"],
@@ -379,53 +379,9 @@ Fact extraction runs in the same background consolidation worker that builds epi
 reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for standing rules
 worth carrying into future sessions.
 
-[//]: # (![Consolidating Events]&#40;/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extarcting_rules_and_episodes.png&#41;)
-```text
-+------------------------------------------------------------------------+
-| 1. APPEND-ONLY EVENT LOG (Activity: act_1043, Recovery)                |
-|                                                                        |
-|  - feedback.received   Engineer explains QA dependency                 |
-|  - tool.completed      restart_instance succeeded                      |
-|  - activity.completed  Recovery finished <-- Checkpoint                |
-+------------------------------------------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-| 2. BACKGROUND CONSOLIDATION WORKER                                     |
-|                                                                        |
-|  Build Episode                                                         |
-|    - Record the restart and engineer feedback                          |
-|    - Upsert Episode (ep_act_1043)                                      |
-|                                                                        |
-|  Extract Candidate Facts                                               |
-|    +-- Application Code                                                |
-|    |     Scope, actor role, evidence refs, entity resolution           |
-|    |                                                                   |
-|    +-- Structured LLM Pass                                             |
-|          Entity, attribute, standing rule, end condition               |
-|                                                                        |
-|  Candidate: Keep gpu-bench-01 running until QA migrates to Kubernetes  |
-+------------------------------------------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-| 3. VALIDATION & RECONCILIATION                                         |
-|                                                                        |
-|  - Check authority and supporting evidence                             |
-|  - Compare with existing facts for the same scope/entity/attribute     |
-|  - Insert, retain, supersede, or retire as appropriate                 |
-+------------------------------------------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-| 4. SEARCHABLE MEMORY STORE                                             |
-|                                                                        |
-|  Episode: ep_act_1043                                                  |
-|  Fact:    fact_gpu_bench_01_policy (current)                           |
-+------------------------------------------------------------------------+
-```
+![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extarcting_rules_and_episodes.png)
 
-In this example, the engineer's feedback is the source of the new rule. Other agents might extract reusable knowledge
+In this example, the engineer's message is the source of the new fact. Other agents might extract reusable knowledge
 from tool results, task outcomes, or external observations. The extraction process follows the same pattern:
 
 ```python
@@ -434,41 +390,37 @@ class ExtractedRule(BaseModel):
     attribute: str
     value: str
     ends_when: str | None = None
+    event_ids: list[str]  # events this fact is based on
 
-
-class CandidateRules(BaseModel):
-    rules: list[ExtractedRule]
+class CandidateFacts(BaseModel):
+    rules: list[ExtractedFact]
 
 
 def extract_candidate_facts(events, episode):
+    extracted = llm.extract_structured(
+        schema=CandidateFacts,
+        context={
+            "events": select(events),
+            "known_entities": episode["entities"],
+        },
+    )
+    
     candidates = []
-
-    for event in events:
-        if event.event_type != "feedback.received":
+    for fact in extracted.facts:
+        cited = [e for e in events if e.event_id in fact.event_ids]
+        entity = resolve_entity(fact.entity, episode["entities"])
+        if not cited or entity is None or not grounded_in_events(fact, cited):
             continue
 
-        extracted = llm.extract_structured(
-            schema=CandidateRules,
-            context={
-                "feedback": event.data,
-                "known_entities": episode["entities"],
-            },
-        )
-
-        for rule in extracted.rules:
-            entity = resolve_entity(rule.entity, episode["entities"])
-            if entity is None or not grounded_in_feedback(rule, event.data):
-                continue
-
-            candidates.append({
-                "scope": episode["scope"],
-                "entity": entity,
-                "attribute": normalize_attribute(rule.attribute),
-                "value": rule.value,
-                "ends_when": rule.ends_when,
-                "authority_role": event.actor["role"],
-                "source": event.evidence_ref,
-            })
+        candidates.append({
+            "scope": episode["scope"],
+            "entity": entity,
+            "attribute": normalize_attribute(fact.attribute),
+            "value": fact.value,
+            "ends_when": fact.ends_when,
+            "authority_role": lowest_authority(cited),
+            "source": [e.evidence_ref for e in cited],
+        })
 
     return candidates
 ```
@@ -501,66 +453,46 @@ out the instruction that matters.
 
 ### Reconciling New Information Against Active Rules
 
-Before accepting a new candidate fact, the consolidation worker searches for existing `current` facts matching the same
-scope, canonical entity identifier, and attribute. It also separates transient observations from genuine policy updates:
+Before accepting a new candidate fact, the consolidation worker looks for a `current` fact with the same scope, canonical
+entity identifier, and attribute. With none, an authorized statement becomes `current` and an unauthorized claim is
+recorded as `unverified`. With one, the worker compares the incoming signal against it:
 
 ```text
-                +-----------------------------------------+
-                |  Incoming Observation / Candidate Rule  |
-                +--------------------+--------------------+
-                                     |
-                                     v
-                +-----------------------------------------+
-                |  Lookup Active Fact in Store            |
-                |  Key: (scope, entity, attribute)        |
-                +--------------------+--------------------+
-                                     |
-              +----------------------+----------------------+
-              | No active fact                              | Active fact exists
-              v                                             v
-+-------------------------------+     +---------------------------------------------------+
-| Is it an authorized rule?     |     | Compare Incoming Signal Against Active Fact       |
-|                               |     +---------------------------------------------------+
-|  YES -> INSERT as [current]   |     |                                                   |
-|  NO  -> Keep in event log     |     |  1. Repeats same rule                             |
-|         or flag as unverified |     |     -> Keep [current]; link new evidence          |
-+-------------------------------+     |                                                   |
-                                      |  2. Compatible telemetry (48h at 0% CPU)          |
-                                      |     -> Ignore; leave [current] rule untouched     |
-                                      |                                                   |
-                                      |  3. Unverified contradiction (dev chat comment)   |
-                                      |     -> Keep [current] rule; flag claim for review |
-                                      |                                                   |
-                                      |  4. Authorized change (infra_lead updates policy) |
-                                      |     -> Mark old [superseded]; INSERT new [current]|
-                                      |                                                   |
-                                      |  5. End condition met (K8s migration verified)    |
-                                      |     -> Mark old rule [retired]                    |
-                                      +---------------------------------------------------+
+                            +- Same rule restated        -> [current]
+                            |  "Yes, keep it running"       + new evidence linked
+                            |
+                            +- Idle metrics, 48h at 0%   -> [current]
++-----------------------+   |  (telemetry, not a rule)      nothing stored
+| ACTIVE FACT [current] |   |
+| Keep gpu-bench-01     |---+- Unauthorized claim        -> [current]
+| running until QA      |   |  "Probably shut it down"      claim kept as [unverified]
+| migrates to K8s       |   |
++-----------------------+   +- Authorized change         -> [superseded]
+                            |  "Keep it through next week"  new fact is [current]
+                            |
+                            +- End condition verified    -> [retired]
+                               "K8s migration confirmed"    restriction removed
+
+No active fact:  authorized -> [current]  |  not authorized -> [unverified]
 ```
 
-When new evidence repeats an existing rule, the worker links the supporting reference without creating a duplicate. An
-observation that is merely compatible with the rule, such as the 48-hour idle metrics, doesn't change anything in
-semantic memory, since raw telemetry already lives in the event log and cloud APIs. And when an unverified comment contradicts
-an active policy, the worker preserves the standing restriction and flags the claim for review rather than letting
-casual chatter override an authorized instruction.
+The first three branches leave the standing rule untouched. A restatement just adds its evidence to the existing fact.
+Idle metrics are ignored: they describe the instance's state rather than a rule, and the event log and cloud APIs already
+hold that data. An unauthorized comment like "Probably shut it down" is recorded as `unverified`, so casual chat can't
+silently override an approved restriction.
 
-An explicit instruction from an authorized operator is different. Suppose the infrastructure lead says, "QA has changed
-its plans. Keep the instance reserved through next week's final benchmark instead of waiting for the Kubernetes
-migration." The lead may be authorized to replace the policy even though the original migration condition hasn't been
-satisfied. The previous fact is marked as superseded, and the replacement becomes current, retaining its own source and
-supporting evidence. Keeping the older version makes it possible to understand why the policy changed.
+The other two branches change the policy and need an authoritative source. Suppose the infrastructure lead says, "QA has
+changed its plans. Keep the instance reserved through next week's final benchmark instead of waiting for the Kubernetes
+migration." The lead can modify lifecycle rules, so the old fact becomes `superseded` and the new one becomes `current`
+with its own source, even though the original migration condition wasn't met.
 
-A rule can also end because its stated condition has been met. The condition itself isn't self-verifying: the runtime
-needs trustworthy evidence, such as confirmation from an authorized operator or an authoritative system, before retiring
-the exemption. And retiring it doesn't mean the instance must be stopped; it removes that particular restriction.
-The agent's normal cleanup policy still determines what happens next.
+A rule also ends when its `ends_when` condition is met, but conditions aren't self-verifying. The runtime waits for
+confirmation from an authorized operator or an authoritative system before marking the fact `retired`. That lifts the
+exemption without forcing a shutdown: the standard cleanup policy applies again. Superseded and retired facts stay in the
+store as an audit trail but are excluded from active retrieval.
 
-In both cases, the previous knowledge remains available as history but no longer participates in retrieval as an active
-constraint.
-
-In the original midweek scenario, neither the idle metrics nor the developer's comment justifies changing the
-restriction. The active semantic fact therefore remains unchanged:
+In the midweek scenario, neither the idle metrics nor the developer's comment has the authority to change the policy, so
+the active semantic fact remains unchanged:
 
 ```json
 {
@@ -574,7 +506,7 @@ restriction. The active semantic fact therefore remains unchanged:
   "ends_when": "QA regression suite migrated to shared Kubernetes cluster",
   "status": "current",
   "authority_role": "infra_lead",
-  "source": "trace://act_1043/feedback"
+  "source": "trace://act_1043/message"
 }
 ```
 
@@ -630,19 +562,19 @@ TURN 2: Enriched Recall (Entity-Driven)
   +-- Agent Action  : Stops dev-sandbox-04; leaves gpu-bench-01 running
 ```
 
-Here is how the runtime updates `turn_context` after each tool execution so the next turn can query against newly
+Here is how the runtime updates `context` after each tool execution so the next turn can query against newly
 discovered resources:
 
 ```python
-def update_turn_context(turn_context, action, tool_result):
+def update_context(context, action, tool_result):
     # 1. Keep the live tool observation for the current prompt window
-    turn_context.live_observations.append(tool_result.summary)
+    context.live_observations.append(tool_result.summary)
 
     # 2. Extract entity ids from structured tool args/outputs (e.g. resource ids, service names)
     discovered_ids = extract_entity_ids(action.args, tool_result.structured_data)
     for entity_id in discovered_ids:
-        if entity_id not in turn_context.active_entities:
-            turn_context.active_entities.append(entity_id)
+        if entity_id not in context.active_entities:
+            context.active_entities.append(entity_id)
 ```
 
 ### Why Vector Search Alone Isn't Enough: 3-Way Hybrid Retrieval
@@ -788,11 +720,11 @@ When building the prompt view for a turn, the runtime pulls from three sources:
 1. **Live Observations:** Outputs from tools executed during the current session, such as CPU utilization or resource
    status.
 2. **Retrieved Long-Term Memories:** The ranked semantic facts, past episodes, and procedures returned by `recall()`.
-3. **Recent Session Context:** Messages, feedback, and other events from the active session that haven't yet been
+3. **Recent Session Context:** User messages and other events from the active session that haven't yet been
    consolidated into long-term memory.
 
 Recent session context bridges the delay introduced by asynchronous consolidation. If a user corrects the agent and
-immediately continues the conversation, that feedback can influence the next decision without waiting for a semantic
+immediately continues the conversation, that message can influence the next decision without waiting for a semantic
 fact to be extracted. This covers continuity within the active session; a new session started before consolidation
 finishes may still miss the correction. For critical updates, the runtime may need to read recent events directly or
 persist the constraint synchronously.
@@ -800,7 +732,7 @@ persist the constraint synchronously.
 ```text
 +------------------------+  +--------------------------+  +-------------------------+
 | Live Turn Observations |  | Recent Session Context   |  | Recalled Store Memories |
-| (Current tool outputs) |  | (Messages & feedback)    |  | (Facts, Procedures,     |
+| (Current tool outputs) |  | (User messages)          |  | (Facts, Procedures,     |
 +------------------------+  +--------------------------+  |  Past Episodes)         |
             |                            |                +-------------------------+
             +----------------------------+-----------------------------+
@@ -868,13 +800,13 @@ ACTIVE SEMANTIC CONSTRAINTS (Retrieved Data)
     Keep running for Friday-night QA regression benchmarks.
     Ends when: QA migrates its suite to the shared Kubernetes cluster.
     Status: current | Authority: infra_lead
-    Source: trace://act_1043/feedback
+    Source: trace://act_1043/message
 
 RELEVANT PAST EPISODES (Retrieved Data)
   - [ep_act_1043 | completed]
     Restarted gpu-bench-01 after the engineer reported that
     the earlier shutdown broke QA's regression suite.
-    Source: trace://act_1043/feedback
+    Source: trace://act_1043/message
 
   - [ep_act_1042 | completed]
     Stopped gpu-bench-01 after observing 0.2% average CPU
