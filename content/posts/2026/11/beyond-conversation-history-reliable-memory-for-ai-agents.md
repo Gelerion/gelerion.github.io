@@ -42,20 +42,19 @@ You can correct an agent's mistake today, watch it fix the problem, and still se
 tomorrow. That happens not because the model is incapable of learning from what happened, but because the next session
 has no access to that experience.
 
-In production, agents need to combine live system state with knowledge accumulated over time. APIs and monitoring tools
-can tell them what's happening right now, but past actions, their outcomes, operational incidents, and human corrections
-may reveal things that live state alone cannot explain. Losing that knowledge can turn an otherwise reasonable action
-into a costly mistake.
+In production, agents need to combine live system state with knowledge built up over time. APIs and monitoring tools
+show what's happening right now. Past actions, their outcomes, incidents, and human corrections explain things live
+state can't, and without them a reasonable-looking action can turn into a costly mistake.
 
-The real engineering challenge is deciding what deserves to survive a session, keeping that knowledge accurate as
-reality changes, and bringing it back at the exact step where the agent needs it.
+The real engineering challenge is deciding what should survive a session, keeping that knowledge accurate as 
+things change, and bringing it back at the step where the agent needs it.
 
 ## 1. When Agent Memory Fails: The “Idle” Friday Server
 
-Suppose you run an infrastructure cleanup agent named `CostGuard` that sweeps your staging environment (`staging-cloud`)
-every week to shut down idle compute instances and trim cloud spend.
+Suppose you run an infrastructure cleanup agent called `CostGuard` that sweeps your staging environment (`staging-cloud`)
+every week, shutting down idle compute instances to trim cloud spend.
 
-Watch what happens across a single week without structured runtime memory:
+Here is one week without structured runtime memory:
 
 * **Friday afternoon:** The agent scans `staging-cloud` and spots `gpu-bench-01`, an expensive GPU instance averaging
   0.2% CPU utilization over the past 72 hours. Following its standard cleanup playbook, it stops the instance.
@@ -70,20 +69,19 @@ The agent queries the cloud provider, lists the running instances, and checks th
 shows near-zero CPU utilization since the restart. With no memory of Monday's instruction, it treats the server like any
 other idle instance and shuts it down a second time.
 
-Two common approaches to cross-session memory can still miss what matters here:
+Two common approaches to cross-session memory both miss what matters here:  
+**Standard RAG** over chat logs misses the relevant constraint. Thursday's prompt is "Run the weekly staging cost cleanup."
+It never mentions `gpu-bench-01`, QA, or regression benchmarks. If retrieval runs only once, against the user's initial
+request, Monday's instruction has no reason to rank high enough to make the cut. The agent only learns that
+`gpu-bench-01` is involved after its cloud discovery tool returns mid-session.  
+**Rolling session summaries** mix stale history with live state. They can omit important details or carry forward
+observations that are no longer true. Last week's CPU metrics, or whether an instance was running several days ago,
+aren't worth remembering, because the cloud API gives live ground truth on demand. The instruction that changes how
+those metrics should be read is the part worth keeping.
 
-* **Standard RAG over chat logs misses the relevant constraint:** Look at Thursday's prompt: "Run the weekly staging
-  cost cleanup." It never mentions `gpu-bench-01`, QA, or regression benchmarks. If memory retrieval only runs once
-  against the user's initial request, the earlier instruction has no reason to rank high enough to make the cut. The
-  agent only learns that `gpu-bench-01` is involved after it calls its cloud discovery tool mid-session.
-* **Rolling session summaries blur stale history with live state:** Summaries compress history, but they can omit
-  important details or carry forward observations that are no longer true. There's little value in remembering last
-  week's CPU metrics or whether an instance was running several days ago—the cloud API provides live ground truth on
-  demand. What matters is preserving the instruction that changes how those metrics should be interpreted.
-
-What the agent must remember is why the instance has to stay up despite looking idle, what broke the last time it was
-stopped, and what condition eventually lifts that restriction. The key is making that **knowledge** available right when
-the agent is about to act on `gpu-bench-01`, even if the user never mentions the instance by name.
+The agent has to remember why the instance must stay up despite looking idle, what broke the last time it was stopped,
+and what condition lifts the restriction. That knowledge needs to be available right when the agent is about to act on
+`gpu-bench-01`, even if the user never names the instance.
 
 ## 2. Runtime Architecture: Reading and Storing Memory
 
@@ -96,31 +94,11 @@ A more reliable pattern moves memory orchestration out of the model's tool belt 
 wrapping the agent loop. The runtime takes responsibility for capturing execution history, maintaining persistent 
 knowledge, and retrieving relevant context as a task unfolds.
 
-But memory isn't a single store of conversation history. An operational agent needs several kinds of information: 
-records of what happened, knowledge that remains useful across sessions, reusable procedures, and the immediate context 
-required for its next decision. These map to four distinct types of memory that accumulate knowledge over time, 
-and one ephemeral context assembled on the fly:
+But memory isn't a single store of conversation history. An operational agent needs records of what happened, knowledge
+that stays useful across sessions, reusable procedures, and the immediate context for its next decision. That gives four
+kinds of memory: three that persist across sessions, and a working memory assembled on the fly for each turn:
 
-```text
-                     APPLICATION RUNTIME
-  +-----------------------------------------------------------+
-  |  WORKING MEMORY (Ephemeral — rebuilt on every turn)       |
-  |  [ Active Request + Live Tool Outputs + Recalled Memory ] |
-  +-----------------------------------------------------------+
-                 |                             ^
-                 |  Execution                  | Targeted
-                 |  Events                     | Recall
-                 v                             |
-  +-----------------------------------------------------------+
-  |                     PERSISTENT MEMORY                     |
-  |                                                           |
-  |  +-----------------+  +---------------+  +-------------+  |
-  |  | EPISODIC        |  | SEMANTIC      |  | PROCEDURAL  |  |
-  |  | Past events &   |->| Standing facts|->| Playbooks & |  |
-  |  | session outcomes|  | & constraints |  | workflows   |  |
-  |  +-----------------+  +---------------+  +-------------+  |
-  +-----------------------------------------------------------+
-```
+![Application Runtime](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s2_application_runtime.png)
 
 Each type serves a different purpose:
 * **Episodic Memory (What happened):** Concrete records of past activities, observations, and outcomes across sessions.
@@ -131,33 +109,13 @@ Each type serves a different purpose:
 * **Working Memory (What matters right now):** The compact, token-bounded context assembled for a single model call,
   combining the active user request, live tool outputs, and recalled long-term memories.
 
-The first three persist across sessions, though they don't all come from the same place: episodes and semantic rules are 
-usually extracted from live runtime events, while procedures are often written or curated by engineers. Working memory 
-is the exception—it only exists for a single turn and gets rebuilt from scratch on the next.
+The three persistent types don't all come from the same place. Episodes and semantic rules are usually extracted from
+live runtime events, while procedures are often written or curated by engineers. Working memory exists only for a
+single turn and is rebuilt from scratch on the next.
 
 Here's how the four memory types apply to the `CostGuard` example:
 
-```text
-AGENT-OBSERVED EVENTS (Captured live during execution)
-  Friday   | Metrics read (0.2% CPU) -> stop_instance(gpu-bench-01) succeeded
-  Monday   | Engineer requests restart, explaining the QA failure
-                           |
-                           v
-EPISODIC MEMORY (What happened)
-  Cleanup  | Stopped gpu-bench-01 after observing 0.2% CPU over 72h
-  Recovery | Restarted gpu-bench-01 after the shutdown broke QA benchmarks
-                           |
-                           v
-SEMANTIC MEMORY (What we learned)
-  Rule     | Keep gpu-bench-01 running until QA migrates its
-           | regression suite to the shared Kubernetes cluster.
-                           |
-                           v
-WORKING MEMORY (Recalled on next Friday's run)
-  Context  | Task: Clean up idle staging instances
-           | Candidate: gpu-bench-01 (0.2% CPU)
-           | Active Constraint: Keep gpu-bench-01 running (QA suite)
-```
+![Four Memeory layers](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s2_four_memory_layers.png)
 
 ### Writing Memories
 
@@ -165,27 +123,13 @@ Every time an agent runs a tool, receives an error, completes a task, or gets hu
 event. Capturing those events is cheap; turning them into clean, trustworthy memories takes more work. An event-driven
 pipeline handles that processing asynchronously, keeping it out of the agent's execution path.
 
-```text
-+-----------------------+                     +--------------------------------+
-|      Agent Loop       |    Publish Event    |        Event Log Store         |
-|    Recall -> Act      | ------------------> |  (Raw tool calls & feedback)   |
-+-----------^-----------+                     +---------------+----------------+
-            |                                                 |
-            |                                                 | Consume events;
-            | Recall by scope,                                | consolidate at
-            | intent & active_entities                        | checkpoints
-            |                                                 v
-+-----------------------+                     +--------------------------------+
-|   Searchable Memory   |   Upsert Episodes   |     Consolidation Pipeline     |
-| (Episodes, Facts...)  | <------------------ |  (Group, extract & reconcile)  |
-+-----------------------+   & Semantic Facts  +--------------------------------+
-```
+![Writing Memories](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s2_writing_memories.png)
 
 During the active turn loop, the runtime publishes structured events to an append-only log as tools finish and users
 respond. Because event publishing involves no LLM calls, it adds minimal overhead to the agent's execution.
 
 Memory consolidation happens in the background via a worker or stream consumer. Rather than calling an LLM after every
-single tool execution, the worker waits for meaningful checkpoints—such as a completed task, a verification failure, or
+single tool execution, the worker waits for meaningful checkpoints, such as a completed task, a verification failure, or
 explicit user feedback. When a checkpoint fires, the worker inspects the grouped events, builds or updates an episode if
 the activity is worth keeping, and extracts any new standing rules to reconcile against existing semantic facts.
 
@@ -208,8 +152,8 @@ def agent_step(task, context):
 
 This step repeats throughout the cleanup. The initial request only describes the high-level task, so the first recall
 pass pulls general workflow context. Once the agent lists the staging instances, however, the next iteration has
-concrete resource identifiers to search for—surfacing any resource-specific restrictions before the agent decides what
-to shut down. Meanwhile, events from the current execution are recorded without waiting for background extraction to
+concrete resource identifiers to search for, which surfaces any resource-specific restrictions before the agent decides
+what to shut down. Meanwhile, events from the current execution are recorded without waiting for background extraction to
 finish.
 
 ## 3. Episodic Memory: Capturing What Happened
@@ -225,19 +169,7 @@ attempt involving several observations and state-changing actions.
 Consider the initial cleanup. `CostGuard` inspects `gpu-bench-01`, sees almost no CPU activity over the last three days,
 and shuts it down.
 
-```text
-14:00                       14:01                       14:02
-[Tool Completed]            [Tool Completed]            [Activity Completed]
-get_instance_metrics        stop_instance               Cleanup activity
-gpu-bench-01 (0.2% CPU)     gpu-bench-01 (succeeded)    finished (Checkpoint)
-      |                           |                            |
-      +---------------------------+----------------------------+
-                                  |
-                         Grouped by activity_id
-                                  |
-                                  v
-                    [ Consolidated Episode: ep_act_1042 ]
-```
+![Episode Timeline](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s3_episode_timeline.png)
 
 Instead of writing a single summary at the end of a chat session, the runtime records events as they happen and groups
 related steps asynchronously into an episode. That preserves what the agent actually did and observed during the
@@ -248,7 +180,7 @@ operation, even when downstream consequences only become clear in a later sessio
 Separating raw runtime events from consolidated episodes gives each record a clear job and a lean, domain-agnostic
 schema.
 
-A **Runtime Event** is a single, point-in-time record written when something happens—a tool completes, a user provides
+A **Runtime Event** is a single, point-in-time record written when something happens: a tool completes, a user provides
 feedback, or an activity finishes. Events are append-only and fast to write. We don't inject raw events straight into
 future prompts because a single task might generate dozens of intermediate observations and retries.
 
@@ -277,45 +209,22 @@ happened, the observed execution status, and how the activity was resolved, if k
 | `sources` | References to the underlying events or supporting evidence |
 | `created_at`, `updated_at` | When the episode was created and last updated |
 
-All events from the same operation share an `activity_id`—for example, inspecting and stopping `gpu-bench-01` belong to
-one activity, while a later recovery attempt receives another. The consolidated episode keeps the context needed for
-recall without replaying the entire execution trace, while its `sources` field provides a way back to the underlying
-evidence whenever more detail is needed.
+All events from the same operation share an `activity_id`. Inspecting and stopping `gpu-bench-01` belong to one
+activity, for example, while a later recovery attempt receives another. The consolidated episode keeps the context
+needed for recall without replaying the entire execution trace, and its `sources` field points back to the underlying
+evidence when more detail is needed.
 
 ### Consolidating Events
 
 Because the background processor waits for checkpoints rather than summarizing every event as it arrives, it can
 evaluate an operation as a whole. A completed activity is an obvious checkpoint; others include a failed operation,
-explicit user feedback, or a long-running task reaching an intermediate milestone—an unfinished debugging session, for
+explicit user feedback, or a long-running task reaching an intermediate milestone. An unfinished debugging session, for
 example, may still contain useful context even without a final outcome.
 
 A checkpoint triggers evaluation, but doesn't guarantee that a new episode will be created. Routine read-only checks can
 be skipped or kept merely as supporting evidence for a larger experience.
 
-```text
-+-----------------------------------------------------------------------+
-| 1. APPEND-ONLY EVENT LOG (Grouped by activity_id: act_1042)           |
-|  - Event 1: tool.completed      (14:00)                               |
-|  - Event 2: tool.completed      (14:01)                               |
-|  - Event 3: activity.completed  (14:02) <-- Checkpoint fires          |
-+-----------------------------------------------------------------------+
-                    |                                 |
-                    v                                 v
-+-------------------------------------+  +------------------------------+
-| 2a. APPLICATION CODE                |  | 2b. STRUCTURED LLM PASS      |
-|  - Derive execution status          |  |  - Write summary (what was   |
-|  - Collect entities                 |  |    attempted & observed)     |
-|  - Preserve scope & evidence        |  |  - Write resolution, if any  |
-+-------------------------------------+  +------------------------------+
-                    |                                 |
-                    +----------------+----------------+
-                                     |
-                                     v
-+-----------------------------------------------------------------------+
-| 3. SEARCHABLE MEMORY STORE                                            |
-|  - Upsert Episode ep_act_1042 (Indexed by scope, entities, and time)  |
-+-----------------------------------------------------------------------+
-```
+![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s3_consolidating_events.png)
 
 For events that pass this filter, the worker splits the job between application code and the language model. Application
 code derives the execution status, merges entity identifiers, and collects evidence references directly from the
@@ -328,7 +237,7 @@ event content may already be sufficient without a model pass.
 As the agent inspects and stops the instance, the runtime captures three events without relying on the model to call a
 `save_memory()` tool:
 
-```python
+```java
 # CostGuard inspects gpu-bench-01
 publish_runtime_event(
     activity_id="act_1042",
@@ -362,8 +271,8 @@ publish_runtime_event(
 )
 ```
 
-The runtime attaches the remaining fields—such as the event ID, timestamp, actor, and scope—and records the stable cloud
-resource identifier (`cloud-instance:i-09a8f`) alongside its display name.
+The runtime attaches the remaining fields (event id, timestamp, actor, and scope) and records the stable cloud resource
+identifier (`cloud-instance:i-09a8f`) alongside its display name.
 
 When the checkpoint triggers `build_episode()`, the background worker combines code-derived metadata with the
 LLM-generated summary:
@@ -427,27 +336,26 @@ The memory store manages creation and update timestamps during persistence, prod
 }
 ```
 
-Look closely at the `status` field: it is `completed`, not `correct` or `safe`. When the cleanup finishes, the API call
-has succeeded and the QA benchmark hasn't failed yet. The episode accurately records the execution as the agent observed
-it at the time. When the engineer later steps in to restart the server and explain what broke, that feedback produces a
-separate recovery episode—and gives the consolidation worker something more durable to extract: a standing operational
-rule.
+The `status` field is `completed`, not `correct` or `safe`. When the cleanup finishes, the API call has succeeded and
+the QA benchmark hasn't failed yet. The episode records the execution as the agent observed it at the time. When the
+engineer later steps in to restart the server and explain what broke, that feedback produces a separate recovery
+episode. It also gives the consolidation worker something more durable to extract: a standing operational rule.
 
 ## 4. Semantic Memory: Standing Rules and Evolving Reality
 
-The engineer's correction does more than explain the earlier failure. It establishes knowledge that `CostGuard` must
-apply long after the recovery session ends: QA depends on the instance, and it needs to stay running until the
-regression suite moves to Kubernetes.
+The engineer's correction explains the earlier failure, and it also establishes knowledge that `CostGuard` must apply
+long after the recovery session ends: QA depends on the instance, and it needs to stay running until the regression
+suite moves to Kubernetes.
 
 As an agent accumulates experience, relying on episodic history alone becomes impractical. You don't want it digging
 through a dozen past incident summaries every time it needs to determine which restrictions currently apply to a
-resource. Semantic facts give the agent direct access to reusable knowledge—whether operational rules, user preferences,
-or service dependencies—while episodes preserve the history and evidence behind them.
+resource. Semantic facts give the agent direct access to reusable knowledge (operational rules, user preferences,
+service dependencies), while episodes preserve the history and evidence behind them.
 
 ### What a Semantic Fact Looks Like
 
 Many operational facts are conditional or temporary: an instance exemption lasts until a workload migrates, a billing
-hold lasts until an invoice clears, and a release freeze lasts until a hotfix ships. To track standing rules without
+hold until an invoice clears, a release freeze until a hotfix ships. To track standing rules without
 losing sight of when they expire or who established them, each semantic fact stores a small set of structured fields:
 
 | Field | Purpose |
@@ -461,9 +369,9 @@ losing sight of when they expire or who established them, each semantic fact sto
 | `status` | Whether the fact is `current`, `unverified`, `superseded`, or `retired` |
 | `authority_role`, `source` | Authenticated role of the source actor and reference to the supporting evidence |
 
-Notice that the engineer's instruction doesn't expire on a fixed date; it expires on an operational condition. That
-condition must be verified before the restriction can be retired—the mere passage of time or another stretch of low
-utilization isn't enough.
+The engineer's instruction doesn't expire on a fixed date. It expires on an operational condition, and that condition
+must be verified before the restriction can be retired. The passage of time or another stretch of low utilization isn't
+enough.
 
 ### Extracting Rules Alongside Episodes
 
@@ -471,6 +379,7 @@ Fact extraction runs in the same background consolidation worker that builds epi
 reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for standing rules
 worth carrying into future sessions.
 
+[//]: # (![Consolidating Events]&#40;/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extarcting_rules_and_episodes.png&#41;)
 ```text
 +------------------------------------------------------------------------+
 | 1. APPEND-ONLY EVENT LOG (Activity: act_1043, Recovery)                |
@@ -580,15 +489,15 @@ Suppose an engineer requests another staging cost review midweek. The agent quer
 *"Looks like gpu-bench-01 isn't being used anymore. We can probably shut it down."*
 
 Both observations are captured through normal runtime events, yet neither proves that the standing restriction has
-expired. Low utilization midweek is completely consistent with a machine reserved for weekend benchmarks, and the
+expired. Low utilization midweek is consistent with a machine reserved for weekend benchmarks, and the
 developer's remark is speculative, offering no evidence that QA has migrated its workload.
 
-A memory system that continually asks an LLM to rewrite a rolling entity summary—or blindly overwrites stored facts with
-the latest observation—will easily mistake these signals for proof that the rule is obsolete. Imagine what happens if
-the memory record shifts from *"Keep this instance running for weekend QA benchmarks"* to *"Instance has been idle for
-48 hours; developer suggests shutting it down."* Both statements reflect something the agent observed, but the second
-carries a different level of authority and doesn't invalidate the first. Simply replacing the old fact with the latest
-observation wipes out the instruction that actually matters.
+A memory system that continually asks an LLM to rewrite a rolling entity summary, or blindly overwrites stored facts with
+the latest observation, will easily mistake these signals for proof that the rule is obsolete. Suppose the memory
+record shifts from *"Keep this instance running for weekend QA benchmarks"* to *"Instance has been idle for 48 hours;
+developer suggests shutting it down."* Both statements reflect something the agent observed, but the second carries a
+different level of authority and doesn't invalidate the first. Replacing the old fact with the latest observation wipes
+out the instruction that matters.
 
 ### Reconciling New Information Against Active Rules
 
@@ -632,23 +541,23 @@ scope, canonical entity identifier, and attribute. It also separates transient o
 
 When new evidence repeats an existing rule, the worker links the supporting reference without creating a duplicate. An
 observation that is merely compatible with the rule, such as the 48-hour idle metrics, doesn't change anything in
-semantic memory—raw telemetry already lives in the event log and cloud APIs. And when an unverified comment contradicts
+semantic memory, since raw telemetry already lives in the event log and cloud APIs. And when an unverified comment contradicts
 an active policy, the worker preserves the standing restriction and flags the claim for review rather than letting
 casual chatter override an authorized instruction.
 
-An explicit instruction from an authorized operator is different. Suppose the infrastructure lead says, “QA has changed
-its plans. Keep the instance reserved through next week’s final benchmark instead of waiting for the Kubernetes
-migration.” The lead may be authorized to replace the policy even though the original migration condition hasn’t been
+An explicit instruction from an authorized operator is different. Suppose the infrastructure lead says, "QA has changed
+its plans. Keep the instance reserved through next week's final benchmark instead of waiting for the Kubernetes
+migration." The lead may be authorized to replace the policy even though the original migration condition hasn't been
 satisfied. The previous fact is marked as superseded, and the replacement becomes current, retaining its own source and
 supporting evidence. Keeping the older version makes it possible to understand why the policy changed.
 
 A rule can also end because its stated condition has been met. The condition itself isn't self-verifying: the runtime
 needs trustworthy evidence, such as confirmation from an authorized operator or an authoritative system, before retiring
-the exemption. And retiring it doesn't mean the instance must be stopped; it simply removes that particular restriction.
+the exemption. And retiring it doesn't mean the instance must be stopped; it removes that particular restriction.
 The agent's normal cleanup policy still determines what happens next.
 
-In both cases, the previous knowledge remains available as history. It just no longer participates in retrieval as an
-active constraint. 
+In both cases, the previous knowledge remains available as history but no longer participates in retrieval as an active
+constraint.
 
 In the original midweek scenario, neither the idle metrics nor the developer's comment justifies changing the
 restriction. The active semantic fact therefore remains unchanged:
@@ -674,11 +583,10 @@ into the agent's context before it acts on the instance.
 
 ## 5. Finding the Right Context: Progressive Recall and Hybrid Search
 
-Retrieval is where many memory architectures quietly fall apart. It is easy to assume that when a session starts, the
-runtime already has a neat dictionary of metadata naming the exact workflow, target environment, and affected resources
-upfront.
+Retrieval is where many memory architectures fall apart. It is easy to assume that when a session starts, the runtime
+already has metadata naming the exact workflow, target environment, and affected resources.
 
-In a real production agent, you rarely have that luxury at request time. When a user sends a message or a webhook
+In a production agent, you rarely have that at request time. When a user sends a message or a webhook
 triggers a run, the runtime initially knows only three things:
 
 1. **Caller & Agent Identity:** From authentication and the session entry point, the runtime knows who is calling
@@ -689,9 +597,8 @@ triggers a run, the runtime initially knows only three things:
 3. **Live Conversation State:** Whatever messages or tool outputs have accumulated in the current session so far, which
    is empty on Turn 1.
 
-Notice what is *not* known at request time: the runtime does not yet know which specific servers are idle
-(`gpu-bench-01`), which refund transaction failed (`tx_992`), or which file contains the flaky test. Those entities only
-surface **after** the agent starts running tools.
+What the runtime doesn't know yet is which servers are idle (`gpu-bench-01`), which refund transaction failed
+(`tx_992`), or which file contains the flaky test. Those entities only surface after the agent starts running tools.
 
 ### Progressive Recall: Building Context Across Turns
 
@@ -711,12 +618,12 @@ TURN 1: Initial Recall (Prompt-Driven)
   +-- Agent Action  : Calls list_idle_instances("staging-cloud")
                                   |
           Tool returns resources: ["dev-sandbox-04", "gpu-bench-01"]
-          Runtime resolves canonical entity IDs
+          Runtime resolves canonical entity ids
           and adds them to turn_context.active_entities
                                   |
                                   v
 TURN 2: Enriched Recall (Entity-Driven)
-  |-- Known Context : Authorized scope + discovered entity IDs
+  |-- Known Context : Authorized scope + discovered entity ids
   |-- Search Input  : Prompt + newly discovered active_entities
   |-- What Matches  : Active rule for cloud-instance:i-09a8f
   |                   Relevant cleanup & recovery episodes
@@ -731,7 +638,7 @@ def update_turn_context(turn_context, action, tool_result):
     # 1. Keep the live tool observation for the current prompt window
     turn_context.live_observations.append(tool_result.summary)
 
-    # 2. Extract entity IDs from structured tool args/outputs (e.g. resource IDs, service names)
+    # 2. Extract entity ids from structured tool args/outputs (e.g. resource ids, service names)
     discovered_ids = extract_entity_ids(action.args, tool_result.structured_data)
     for entity_id in discovered_ids:
         if entity_id not in turn_context.active_entities:
@@ -740,19 +647,19 @@ def update_turn_context(turn_context, action, tool_result):
 
 ### Why Vector Search Alone Isn't Enough: 3-Way Hybrid Retrieval
 
-With the authorized scope, request text, and discovered entities available, how does it actually search the memory
+With the authorized scope, request text, and discovered entities in hand, how should the runtime search the memory
 store?
 
 Relying purely on vector embeddings creates three blind spots in production:
 
-1. **Embeddings blur exact identifiers:** Dense vectors are great at matching fuzzy concepts (*"cut cloud spend"*
+1. Embeddings blur exact identifiers. Dense vectors are great at matching fuzzy concepts (*"cut cloud spend"*
    $\approx$ *"cost cleanup"*), but they frequently miss exact resource names, error codes, or environment tags like
    `gpu-bench-01`, `staging-cloud`, or `ERR_RATE_LIMIT`.
-2. **Similarity ignores validity:** A rule that was superseded three weeks ago has the exact same cosine similarity to a
+2. Similarity ignores validity. A rule that was superseded three weeks ago has the exact same cosine similarity to a
    query as the rule that replaced it today.
-3. **Similarity doesn't reflect operational priority:** A loosely related incident might score higher than an active
-   restriction that must be considered before taking action. Retrieval needs to account for applicability and
-   importance, not just semantic relevance.
+3. Similarity doesn't reflect operational priority. A loosely related incident might score higher than an active
+   restriction that must be considered before taking action. Retrieval has to weigh applicability and importance as
+   well as semantic relevance.
 
 Memory engines and hybrid search systems address these problems by combining metadata pre-filtering with complementary
 search signals: semantic vector search, keyword matching (BM25), and exact entity lookup.
@@ -776,7 +683,7 @@ search signals: semantic vector search, keyword matching (BM25), and exact entit
 | VECTOR SEARCH     |     | BM25 SEARCH       |     | LOOKUP            |
 |                   |     |                   |     |                   |
 | Matches intent &  |     | Matches exact     |     | Matches records   |
-| workflow meaning  |     | terms in prompt   |     | tagged with IDs   |
+| workflow meaning  |     | terms in prompt   |     | tagged with ids   |
 | ("cost cleanup")  |     | ("staging-cloud") |     | in active_entities|
 +-------------------+     +-------------------+     +-------------------+
             |                         |                         |
@@ -800,10 +707,10 @@ search signals: semantic vector search, keyword matching (BM25), and exact entit
 
 Hard pre-filtering restricts retrieval to memories the caller is authorized to access and prevents superseded or
 unverified facts from showing up as active instructions. Episodes are filtered differently: a completed activity still
-holds valuable history even when its outcome later required a rollback.
+holds useful history even when its outcome later required a rollback.
 
 Within that authorized slice, vector search matches the intent of the request, BM25 catches exact terms like environment
-tags and error codes, and exact entity lookup directly pulls facts and episodes indexed under the canonical resource IDs
+tags and error codes, and exact entity lookup pulls facts and episodes indexed under the canonical resource ids
 in `active_entities`. The results are then deduplicated and ranked, giving applicable entity constraints priority over
 supporting history. Token budgeting should trim lower-priority memories first, without silently dropping restrictions
 that may govern the next action. If those constraints cannot fit, the runtime needs to narrow the context or defer the
@@ -864,9 +771,9 @@ def recall(
     )
 ```
 
-The important part is that entity-specific recall happens after resource discovery but before the agent decides what to
-do with those resources. That timing allows a constraint established in an earlier session to influence the current
-decision, even when the original request never mentioned the affected resource.
+Entity-specific recall has to happen after resource discovery but before the agent decides what to do with those
+resources. That timing lets a constraint established in an earlier session influence the current decision, even when the
+original request never mentioned the affected resource.
 
 ## 6. Putting It Together: Working Memory and Procedural Playbooks
 
@@ -912,7 +819,7 @@ persist the constraint synchronously.
              +-------------------------------------------------------+
 ```
 
-Here is how the runtime builds that view in code
+Here is how the runtime builds that view in code:
 
 ```python
 def assemble_working_context(
@@ -986,9 +893,9 @@ evaluating each host.
 
 ### Treating Procedural Playbooks Like Versioned Code
 
-Look at `ACTIVE PROCEDURE (cleanup_idle_compute v2)` in the assembled prompt. While episodes track what happened during
-a specific attempt and semantic facts hold knowledge about particular resources, procedural memory captures how the
-agent should execute a class of tasks.
+The `ACTIVE PROCEDURE (cleanup_idle_compute v2)` block in the assembled prompt comes from procedural memory. Episodes
+track what happened during a specific attempt and semantic facts hold knowledge about particular resources, while
+procedural memory captures how the agent should execute a class of tasks.
 
 A procedure record stays simple and structured:
 
@@ -1044,10 +951,10 @@ mistake that originally affected one resource could suddenly influence every exe
 Playbook updates should be proposed offline from recurring episodes, reviewed by humans, and versioned just like
 application code so you can roll them back if a new version causes problems.
 
-There is one more detail worth noting in the assembled context: the labels marking semantic facts and episodes as
-`(Retrieved Data)`. Stored memories often contain text originally supplied by users, external tools, or ticket comments.
-Labeling recalled records as data rather than system instructions helps defend against delayed prompt injection—while
-permissions, scope boundaries, and tool authorization remain strictly enforced by the application runtime.
+The assembled context also labels semantic facts and episodes as `(Retrieved Data)`. Stored memories often contain text
+originally supplied by users, external tools, or ticket comments. Labeling recalled records as data rather than system
+instructions helps defend against delayed prompt injection, while permissions, scope boundaries, and tool authorization
+remain strictly enforced by the application runtime.
 
 ## 7. The Payoff: Evaluating Memory on Decisions, Not Search Scores
 
@@ -1058,17 +965,17 @@ Equipped with the assembled working context, here is how `CostGuard` handles the
 > utilization. The previous shutdown broke QA's regression suite, and there's still an active restriction protecting the
 > instance until that workload moves to Kubernetes."
 
-Both instances look idle, but only one is safe to stop. That's the behavior we want to test—not merely whether the
+Both instances look idle, but only one is safe to stop. You want to test that behavior, not just whether the
 memory system retrieved the right records.
 
 ### Measuring Whether Your Memory Architecture Works
 
 When teams evaluate agent memory, they often treat it like a standard search problem, measuring `recall@k` or cosine
 similarity on static question-answering benchmarks. Benchmarks like LongMemEval are helpful for testing retrieval and
-reasoning over long histories, but search scores alone won't tell you whether your runtime actually prevents bad
+reasoning over long histories, but search scores alone won't tell you whether your runtime prevents bad
 production actions.
 
-What matters in production is whether the agent can discover a resource mid-task, retrieve its active constraint, keep
+In production, the question is whether the agent can discover a resource mid-task, retrieve its active constraint, keep
 that constraint intact when irrelevant observations arrive, and let it go once its end condition is verified. Rather
 than testing isolated retrieval queries, build a small set of multi-session scenarios that test the agent's end-to-end
 decisions:
@@ -1109,6 +1016,5 @@ There is no universal threshold where an agent suddenly needs all four memory la
 user preferences has different requirements from an infrastructure agent modifying production resources. Start with the
 smallest memory layer that solves a real failure mode, and add structure as your agent's responsibilities grow.
 
-A useful memory system doesn't just help an agent remember what happened. It helps the agent distinguish what still
-matters from what has changed, apply that knowledge to the next decision, and trace its reasoning back to the evidence
-that informed it.
+A useful memory system helps an agent distinguish what still matters from what has changed, apply that knowledge to the
+next decision, and trace its reasoning back to the evidence that informed it.

@@ -174,3 +174,17 @@ details > *:not(summary) {
   background-color: var(--dark-code-block-bg);
   border-color: var(--dark-surface);
 }
+
+/* Post images: shown at 75% of the text width, centered. */
+.blog-post img {
+  display: block;
+  width: 75%;
+  height: auto;
+  margin: 1.5rem auto;
+}
+
+@media (max-width: 768px) {
+  .blog-post img {
+    width: 100%;
+  }
+}
