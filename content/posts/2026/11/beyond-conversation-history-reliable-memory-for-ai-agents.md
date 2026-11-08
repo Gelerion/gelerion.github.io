@@ -109,7 +109,7 @@ Each type serves a different purpose:
 * **Working Memory (What matters right now):** The compact, token-bounded context assembled for a single model call,
   combining the active user request, live tool outputs, and recalled long-term memories.
 
-The three persistent types don't all come from the same place. Episodes and semantic rules are usually extracted from
+The three persistent types don't all come from the same place. Episodes and semantic facts are usually extracted from
 live runtime events, while procedures are often written or curated by engineers. Working memory exists only for a
 single turn and is rebuilt from scratch on the next.
 
@@ -131,7 +131,7 @@ respond. Because event publishing involves no LLM calls, it adds minimal overhea
 Memory consolidation happens in the background via a worker or stream consumer. Rather than calling an LLM after every
 single tool execution, the worker waits for meaningful checkpoints, such as a completed task, a verification failure, or
 explicit user feedback. When a checkpoint fires, the worker inspects the grouped events, builds or updates an episode if
-the activity is worth keeping, and extracts any new standing rules to reconcile against existing semantic facts.
+the activity is worth keeping, and extracts any new semantic facts to reconcile against the existing ones.
 
 ### Reading Memories in the Turn Loop
 
@@ -341,7 +341,7 @@ the QA benchmark hasn't failed yet. The episode records the execution as the age
 engineer later steps in to restart the server and explain what broke, that feedback produces a separate recovery
 episode. It also gives the consolidation worker something more durable to extract: a standing operational rule.
 
-## 4. Semantic Memory: Rules That Outlive a Session
+## 4. Semantic Memory: Facts That Outlive a Session
 
 The engineer's correction explains the earlier failure, and it also establishes knowledge that `CostGuard` must apply
 long after the recovery session ends: QA depends on the instance, and it needs to stay running until the regression
@@ -355,7 +355,7 @@ service dependencies), while episodes preserve the history and evidence behind t
 ### Anatomy of a Semantic Fact
 
 Many operational facts are conditional or temporary: an instance exemption lasts until a workload migrates, a billing
-hold until an invoice clears, a release freeze until a hotfix ships. To track standing rules without
+hold until an invoice clears, a release freeze until a hotfix ships. To track them without
 losing sight of when they expire or who established them, each semantic fact stores a small set of structured fields:
 
 | Field | Purpose |
@@ -373,10 +373,10 @@ The engineer's instruction doesn't expire on a fixed date. It expires on an oper
 must be verified before the restriction can be retired. The passage of time or another stretch of low utilization isn't
 enough.
 
-### Extracting Rules and Checking Authority
+### Extracting Facts and Checking Authority
 
 Fact extraction runs in the same background consolidation worker that builds episodes. When the recovery activity
-reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for standing rules
+reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for durable facts
 worth carrying into future sessions.
 
 ![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extracting_rules_and_episodes.png)
@@ -428,8 +428,8 @@ def extract_candidate_facts(events, episode):
 The entity resolution step maps resource names mentioned in conversation to the stable identifiers already observed by
 the agent, so later retrieval doesn't depend on matching the exact wording an engineer used.
 
-Extracting a plausible instruction doesn't automatically make it an active policy, however. The runtime still checks
-whether the actor is allowed to establish that rule in the target scope. In a personal assistant, an end user can set
+Extracting a plausible instruction doesn't automatically make it an active fact, however. The runtime still checks
+whether the actor is allowed to establish that fact in the target scope. In a personal assistant, an end user can set
 their own meeting preferences; in a shared infrastructure workspace like `staging-cloud`, changing a server's lifecycle
 policy requires an authorized engineering role. Once that role is verified from authenticated runtime metadata, the
 instruction becomes a `current` fact, while the earlier shutdown episode stays intact as historical evidence.
@@ -445,13 +445,13 @@ expired. Low utilization midweek is consistent with a machine reserved for weeke
 developer's remark is speculative, offering no evidence that QA has migrated its workload.
 
 A memory system that continually asks an LLM to rewrite a rolling entity summary, or blindly overwrites stored facts with
-the latest observation, will easily mistake these signals for proof that the rule is obsolete. Suppose the memory
+the latest observation, will easily mistake these signals for proof that the restriction is obsolete. Suppose the memory
 record shifts from *"Keep this instance running for weekend QA benchmarks"* to *"Instance has been idle for 48 hours;
 developer suggests shutting it down."* Both statements reflect something the agent observed, but the second carries a
 different level of authority and doesn't invalidate the first. Replacing the old fact with the latest observation wipes
 out the instruction that matters.
 
-### Reconciling New Evidence with Existing Rules
+### Reconciling New Evidence with Existing Facts
 
 Before accepting a new candidate fact, the consolidation worker looks for a `current` fact with the same scope, canonical
 entity identifier, and attribute. With none, an authorized statement becomes `current` and an unauthorized claim is
@@ -459,22 +459,22 @@ recorded as `unverified`. With one, the worker compares the incoming signal agai
 
 ![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_reconciling.png)
 
-The first three branches leave the standing rule untouched. A restatement just adds its evidence to the existing fact.
+The first three branches leave the current fact untouched. A restatement just adds its evidence to the existing fact.
 Idle metrics are ignored: they describe the instance's state rather than a rule, and the event log and cloud APIs already
 hold that data. An unauthorized comment like "Probably shut it down" is recorded as `unverified`, so casual chat can't
 silently override an approved restriction.
 
-The other two branches change the policy and need an authoritative source. Suppose the infrastructure lead says, "QA has
+The other two branches change the fact and need an authoritative source. Suppose the infrastructure lead says, "QA has
 changed its plans. Keep the instance reserved through next week's final benchmark instead of waiting for the Kubernetes
-migration." The lead can modify lifecycle rules, so the old fact becomes `superseded` and the new one becomes `current`
+migration." The lead can modify lifecycle policies, so the old fact becomes `superseded` and the new one becomes `current`
 with its own source, even though the original migration condition wasn't met.
 
-A rule also ends when its `ends_when` condition is met, but conditions aren't self-verifying. The runtime waits for
+A fact also ends when its `ends_when` condition is met, but conditions aren't self-verifying. The runtime waits for
 confirmation from an authorized operator or an authoritative system before marking the fact `retired`. That lifts the
 exemption without forcing a shutdown: the standard cleanup policy applies again. Superseded and retired facts stay in the
 store as an audit trail but are excluded from active retrieval.
 
-In the midweek scenario, neither the idle metrics nor the developer's comment has the authority to change the policy, so
+In the midweek scenario, neither the idle metrics nor the developer's comment has the authority to change the restriction, so
 the active semantic fact remains unchanged:
 
 ```json
@@ -548,8 +548,8 @@ Relying purely on vector embeddings creates three blind spots in production:
 1. Embeddings blur exact identifiers. Dense vectors are great at matching fuzzy concepts (*"cut cloud spend"*
    ≈ *"cost cleanup"*), but they frequently miss exact resource names, error codes, or environment tags like
    `gpu-bench-01`, `staging-cloud`, or `ERR_RATE_LIMIT`.
-2. Similarity ignores validity. A rule that was superseded three weeks ago has the exact same cosine similarity to a
-   query as the rule that replaced it today.
+2. Similarity ignores validity. A fact that was superseded three weeks ago has the exact same cosine similarity to a
+   query as the fact that replaced it today.
 3. Similarity doesn't reflect operational priority. A loosely related incident might score higher than an active
    restriction that must be considered before taking action. Retrieval has to weigh applicability and importance as
    well as semantic relevance.
@@ -759,13 +759,13 @@ that constraint intact when irrelevant observations arrive, and let it go once i
 than testing isolated retrieval queries, build a small set of multi-session scenarios that test the agent's end-to-end
 decisions:
 
-| Test Scenario                                | Expected Behavior                                              |
-| -------------------------------------------- | -------------------------------------------------------------- |
-| Vague cleanup request                        | Discover the entity and retrieve its active restrictions       |
-| New idle metrics despite an active exemption | Preserve the restriction; don't stop the instance              |
-| Unverified comment suggests shutdown         | Don't override an authorized instruction                       |
-| Migration completion is verified             | Retire the exemption; evaluate under the normal cleanup policy |
-| Request crosses an access boundary           | Never expose memories from unauthorized scopes                 |
+| Test Scenario                                  | Expected Behavior                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| Vague cleanup request                          | Discover the entity and retrieve its active restrictions         |
+| New idle metrics despite an active exemption   | Preserve the restriction; don't stop the instance                |
+| Unverified comment suggests shutdown           | Don't override an authorized instruction                         |
+| Migration completion is verified               | Retire the exemption; evaluate under the normal cleanup policy |
+| Request crosses an access boundary             | Never expose memories from unauthorized scopes                   |
 
 Run the same scenarios against four configurations: no cross-session memory, raw-log RAG, episodic memory only, and the
 full pipeline with semantic facts and reconciliation. Keep the model, tools, and approved procedures consistent across
@@ -786,7 +786,7 @@ As your agent takes on longer, multi-session workflows, you can roll out the arc
    entities become available.
 2. **Consolidate useful episodes:** Group related events at meaningful checkpoints, preserving the outcomes and evidence
    worth recalling.
-3. **Maintain semantic knowledge:** Extract standing rules, verify their authority, and reconcile new evidence against
+3. **Maintain semantic knowledge:** Extract semantic facts, verify their authority, and reconcile new evidence against
    existing constraints.
 4. **Evolve shared procedures:** Use recurring lessons to propose playbook improvements, with human approval and version
    control.
