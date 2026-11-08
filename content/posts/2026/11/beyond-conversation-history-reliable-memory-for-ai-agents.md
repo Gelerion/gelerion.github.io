@@ -49,7 +49,7 @@ state can't, and without them a reasonable-looking action can turn into a costly
 The real engineering challenge is deciding what should survive a session, keeping that knowledge accurate as 
 things change, and bringing it back at the step where the agent needs it.
 
-## 1. When Agent Memory Fails: The “Idle” Friday Server
+## 1. The Server That Got Shut Down Twice
 
 Suppose you run an infrastructure cleanup agent called `CostGuard` that sweeps your staging environment (`staging-cloud`)
 every week, shutting down idle compute instances to trim cloud spend.
@@ -83,7 +83,7 @@ The agent has to remember why the instance must stay up despite looking idle, wh
 and what condition lifts the restriction. That knowledge needs to be available right when the agent is about to act on
 `gpu-bench-01`, even if the user never names the instance.
 
-## 2. Runtime Architecture: Reading and Storing Memory
+## 2. Memory Belongs to the Runtime
 
 A common anti-pattern in agent design is giving the language model a `save_memory()` or `search_memory()` tool and
 hoping it remembers to call them. Models focused on completing a task often fail to record important outcomes, and they
@@ -133,7 +133,7 @@ single tool execution, the worker waits for meaningful checkpoints, such as a co
 explicit user feedback. When a checkpoint fires, the worker inspects the grouped events, builds or updates an episode if
 the activity is worth keeping, and extracts any new standing rules to reconcile against existing semantic facts.
 
-### Memory in the Turn Loop
+### Reading Memories in the Turn Loop
 
 On the read side, the runtime retrieves relevant memories before deciding what to do next. Recall happens throughout the
 task as new resources and observations become available:
@@ -156,7 +156,7 @@ concrete resource identifiers to search for, which surfaces any resource-specifi
 what to shut down. Meanwhile, events from the current execution are recorded without waiting for background extraction to
 finish.
 
-## 3. Episodic Memory: Capturing What Happened
+## 3. Episodic Memory: What Happened
 
 An episode captures a specific experience with enough context to make it useful later. Sometimes that is a single
 interaction, such as a customer reporting a service outage. Other times, the experience unfolds across several tool
@@ -214,7 +214,7 @@ activity, for example, while a later recovery attempt receives another. The cons
 needed for recall without replaying the entire execution trace, and its `sources` field points back to the underlying
 evidence when more detail is needed.
 
-### Consolidating Events
+### Consolidating Events into Episodes
 
 Because the background processor waits for checkpoints rather than summarizing every event as it arrives, it can
 evaluate an operation as a whole. A completed activity is an obvious checkpoint; others include a failed operation,
@@ -232,7 +232,7 @@ recorded events rather than relying on an LLM's interpretation of them. The LLM 
 description of what happened and, when available, how the experience was resolved. For simple interactions, the original
 event content may already be sufficient without a model pass.
 
-### How `CostGuard` Builds an Episode
+### Building an Episode for CostGuard
 
 As the agent inspects and stops the instance, the runtime captures three events without relying on the model to call a
 `save_memory()` tool:
@@ -341,7 +341,7 @@ the QA benchmark hasn't failed yet. The episode records the execution as the age
 engineer later steps in to restart the server and explain what broke, that feedback produces a separate recovery
 episode. It also gives the consolidation worker something more durable to extract: a standing operational rule.
 
-## 4. Semantic Memory: Standing Rules and Evolving Reality
+## 4. Semantic Memory: Rules That Outlive a Session
 
 The engineer's correction explains the earlier failure, and it also establishes knowledge that `CostGuard` must apply
 long after the recovery session ends: QA depends on the instance, and it needs to stay running until the regression
@@ -352,7 +352,7 @@ through a dozen past incident summaries every time it needs to determine which r
 resource. Semantic facts give the agent direct access to reusable knowledge (operational rules, user preferences,
 service dependencies), while episodes preserve the history and evidence behind them.
 
-### What a Semantic Fact Looks Like
+### Anatomy of a Semantic Fact
 
 Many operational facts are conditional or temporary: an instance exemption lasts until a workload migrates, a billing
 hold until an invoice clears, a release freeze until a hotfix ships. To track standing rules without
@@ -373,19 +373,19 @@ The engineer's instruction doesn't expire on a fixed date. It expires on an oper
 must be verified before the restriction can be retired. The passage of time or another stretch of low utilization isn't
 enough.
 
-### Extracting Rules Alongside Episodes
+### Extracting Rules and Checking Authority
 
 Fact extraction runs in the same background consolidation worker that builds episodes. When the recovery activity
 reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for standing rules
 worth carrying into future sessions.
 
-![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extarcting_rules_and_episodes.png)
+![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extracting_rules_and_episodes.png)
 
 In this example, the engineer's message is the source of the new fact. Other agents might extract reusable knowledge
 from tool results, task outcomes, or external observations. The extraction process follows the same pattern:
 
 ```python
-class ExtractedRule(BaseModel):
+class ExtractedFact(BaseModel):
     entity: str
     attribute: str
     value: str
@@ -393,7 +393,7 @@ class ExtractedRule(BaseModel):
     event_ids: list[str]  # events this fact is based on
 
 class CandidateFacts(BaseModel):
-    rules: list[ExtractedFact]
+    facts: list[ExtractedFact]
 
 
 def extract_candidate_facts(events, episode):
@@ -434,7 +434,7 @@ their own meeting preferences; in a shared infrastructure workspace like `stagin
 policy requires an authorized engineering role. Once that role is verified from authenticated runtime metadata, the
 instruction becomes a `current` fact, while the earlier shutdown episode stays intact as historical evidence.
 
-### The Partial Evidence Trap: Why Naive Updates Break Memory
+### The Partial Evidence Trap
 
 Suppose an engineer requests another staging cost review midweek. The agent queries the cloud provider and finds that
 `gpu-bench-01` has remained at 0% utilization for the past 48 hours. During the same interaction, a developer comments,
@@ -451,30 +451,13 @@ developer suggests shutting it down."* Both statements reflect something the age
 different level of authority and doesn't invalidate the first. Replacing the old fact with the latest observation wipes
 out the instruction that matters.
 
-### Reconciling New Information Against Active Rules
+### Reconciling New Evidence with Existing Rules
 
 Before accepting a new candidate fact, the consolidation worker looks for a `current` fact with the same scope, canonical
 entity identifier, and attribute. With none, an authorized statement becomes `current` and an unauthorized claim is
 recorded as `unverified`. With one, the worker compares the incoming signal against it:
 
-```text
-                            +- Same rule restated        -> [current]
-                            |  "Yes, keep it running"       + new evidence linked
-                            |
-                            +- Idle metrics, 48h at 0%   -> [current]
-+-----------------------+   |  (telemetry, not a rule)      nothing stored
-| ACTIVE FACT [current] |   |
-| Keep gpu-bench-01     |---+- Unauthorized claim        -> [current]
-| running until QA      |   |  "Probably shut it down"      claim kept as [unverified]
-| migrates to K8s       |   |
-+-----------------------+   +- Authorized change         -> [superseded]
-                            |  "Keep it through next week"  new fact is [current]
-                            |
-                            +- End condition verified    -> [retired]
-                               "K8s migration confirmed"    restriction removed
-
-No active fact:  authorized -> [current]  |  not authorized -> [unverified]
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_reconciling.png)
 
 The first three branches leave the standing rule untouched. A restatement just adds its evidence to the existing fact.
 Idle metrics are ignored: they describe the instance's state rather than a rule, and the event log and cloud APIs already
@@ -513,7 +496,7 @@ the active semantic fact remains unchanged:
 When the agent encounters the instance during its next cleanup sweep, that constraint now needs to find its way back
 into the agent's context before it acts on the instance.
 
-## 5. Finding the Right Context: Progressive Recall and Hybrid Search
+## 5. Recall: The Right Memory at the Right Step
 
 Retrieval is where many memory architectures fall apart. It is easy to assume that when a session starts, the runtime
 already has metadata naming the exact workflow, target environment, and affected resources.
@@ -532,35 +515,13 @@ triggers a run, the runtime initially knows only three things:
 What the runtime doesn't know yet is which servers are idle (`gpu-bench-01`), which refund transaction failed
 (`tx_992`), or which file contains the flaky test. Those entities only surface after the agent starts running tools.
 
-### Progressive Recall: Building Context Across Turns
+### Progressive Recall
 
 Because the agent discovers what it is working on step by step, memory retrieval cannot be a single search executed once
 before Turn 1. Instead, `recall()` runs at the start of every turn, using a `turn_context` that gets richer as the agent
 interacts with the environment:
 
-```text
-REQUEST ARRIVES
-  Known upfront: Caller Identity (org_id, user_id, role) + Raw Prompt
-                                  |
-                                  v
-TURN 1: Initial Recall (Prompt-Driven)
-  |-- Known Context : scope={workspace: staging-cloud}, active_entities=[]
-  |-- Search Input  : "Run the weekly staging cost cleanup"
-  |-- What Matches  : Playbooks/procedures & memories matching prompt intent
-  +-- Agent Action  : Calls list_idle_instances("staging-cloud")
-                                  |
-          Tool returns resources: ["dev-sandbox-04", "gpu-bench-01"]
-          Runtime resolves canonical entity ids
-          and adds them to turn_context.active_entities
-                                  |
-                                  v
-TURN 2: Enriched Recall (Entity-Driven)
-  |-- Known Context : Authorized scope + discovered entity ids
-  |-- Search Input  : Prompt + newly discovered active_entities
-  |-- What Matches  : Active rule for cloud-instance:i-09a8f
-  |                   Relevant cleanup & recovery episodes
-  +-- Agent Action  : Stops dev-sandbox-04; leaves gpu-bench-01 running
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_progressive_recall.png)
 
 Here is how the runtime updates `context` after each tool execution so the next turn can query against newly
 discovered resources:
@@ -577,7 +538,7 @@ def update_context(context, action, tool_result):
             context.active_entities.append(entity_id)
 ```
 
-### Why Vector Search Alone Isn't Enough: 3-Way Hybrid Retrieval
+### Why Vector Search Alone Isn't Enough
 
 With the authorized scope, request text, and discovered entities in hand, how should the runtime search the memory
 store?
@@ -585,7 +546,7 @@ store?
 Relying purely on vector embeddings creates three blind spots in production:
 
 1. Embeddings blur exact identifiers. Dense vectors are great at matching fuzzy concepts (*"cut cloud spend"*
-   $\approx$ *"cost cleanup"*), but they frequently miss exact resource names, error codes, or environment tags like
+   ≈ *"cost cleanup"*), but they frequently miss exact resource names, error codes, or environment tags like
    `gpu-bench-01`, `staging-cloud`, or `ERR_RATE_LIMIT`.
 2. Similarity ignores validity. A rule that was superseded three weeks ago has the exact same cosine similarity to a
    query as the rule that replaced it today.
@@ -596,46 +557,7 @@ Relying purely on vector embeddings creates three blind spots in production:
 Memory engines and hybrid search systems address these problems by combining metadata pre-filtering with complementary
 search signals: semantic vector search, keyword matching (BM25), and exact entity lookup.
 
-```text
-+-----------------------------------------------------------------------+
-| recall(principal, scope, query_text, active_entities)                 |
-+-----------------------------------------------------------------------+
-                                    |
-                                    v
-+-----------------------------------------------------------------------+
-| 1. HARD BOUNDARY & LIFECYCLE PRE-FILTER (Storage Layer)               |
-|  - Access Boundary : Authorized tenants, users & workspaces           |
-|  - Active Rules    : Current semantic facts and procedures            |
-|  - Past Experience : Completed, failed & unresolved episodes          |
-+-----------------------------------------------------------------------+
-            |                         |                         |
-            v                         v                         v
-+-------------------+     +-------------------+     +-------------------+
-| 2a. SEMANTIC      |     | 2b. KEYWORD /     |     | 2c. EXACT ENTITY  |
-| VECTOR SEARCH     |     | BM25 SEARCH       |     | LOOKUP            |
-|                   |     |                   |     |                   |
-| Matches intent &  |     | Matches exact     |     | Matches records   |
-| workflow meaning  |     | terms in prompt   |     | tagged with ids   |
-| ("cost cleanup")  |     | ("staging-cloud") |     | in active_entities|
-+-------------------+     +-------------------+     +-------------------+
-            |                         |                         |
-            +-------------------------+-------------------------+
-                                      |
-                                      v
-+-----------------------------------------------------------------------+
-| 3. FUSION, PRIORITY RANKING & TOKEN BUDGETING                         |
-|  - Merge results (e.g., Reciprocal Rank Fusion + priority rules)      |
-|  - Prioritize applicable entity constraints & matched procedures      |
-|  - Include useful supporting episodes                                 |
-|  - Trim to fit token budget (e.g., 800 tokens)                        |
-+-----------------------------------------------------------------------+
-                                      |
-                                      v
-+-----------------------------------------------------------------------+
-| 4. WORKING MEMORY                                                     |
-|  - User request + live observations + relevant memories               |
-+-----------------------------------------------------------------------+
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_hybrid_search.png)
 
 Hard pre-filtering restricts retrieval to memories the caller is authorized to access and prevents superseded or
 unverified facts from showing up as active instructions. Episodes are filtered differently: a completed activity still
@@ -648,7 +570,7 @@ supporting history. Token budgeting should trim lower-priority memories first, w
 that may govern the next action. If those constraints cannot fit, the runtime needs to narrow the context or defer the
 decision.
 
-### Putting Hybrid Recall Together
+### Hybrid Recall in Code
 
 Here is how `recall()` brings those three search paths together in code:
 
@@ -669,23 +591,28 @@ def recall(
         scopes=allowed_scopes,
         pre_filter={
             "fact": ["current"],
+            "procedure": ["active"],
             "episode": ["completed", "failed", "unresolved"],
         },
         top_k=10,
     )
 
-    # 3. Exact lookup for resources discovered so far
-    entity_facts = memory_store.find_facts(
-        scopes=allowed_scopes,
-        entities=active_entities,
-        status="current",
-    )
-
-    entity_episodes = memory_store.find_episodes(
-        scopes=allowed_scopes,
-        entities=active_entities,
-        limit=5,
-    )
+    # 3. Exact lookup, skipped on Turn 1 when no entities are known yet
+    entity_facts, entity_episodes = [], []
+    if active_entities:
+        entity_facts = memory_store.find_facts(
+            scopes=allowed_scopes,
+            entities=active_entities,
+            status="current",
+            limit=20,
+        )
+        entity_episodes = memory_store.find_episodes(
+            scopes=allowed_scopes,
+            entities=active_entities,
+            status=["completed", "failed", "unresolved"],
+            order_by="recent",
+            limit=5,
+        )
 
     # 4. Merge, prioritize and fit into the context budget
     candidates = merge_and_deduplicate(
@@ -707,7 +634,7 @@ Entity-specific recall has to happen after resource discovery but before the age
 resources. That timing lets a constraint established in an earlier session influence the current decision, even when the
 original request never mentioned the affected resource.
 
-## 6. Putting It Together: Working Memory and Procedural Playbooks
+## 6. Working Memory and Playbooks: What the Model Sees
 
 Once recall returns the relevant memories, the runtime still needs to combine them with the current task and live
 execution context before calling the model. This assembled view is the agent's working memory: the information available
@@ -729,27 +656,7 @@ fact to be extracted. This covers continuity within the active session; a new se
 finishes may still miss the correction. For critical updates, the runtime may need to read recent events directly or
 persist the constraint synchronously.
 
-```text
-+------------------------+  +--------------------------+  +-------------------------+
-| Live Turn Observations |  | Recent Session Context   |  | Recalled Store Memories |
-| (Current tool outputs) |  | (User messages)          |  | (Facts, Procedures,     |
-+------------------------+  +--------------------------+  |  Past Episodes)         |
-            |                            |                +-------------------------+
-            +----------------------------+-----------------------------+
-                                         |
-                                         v
-             +-------------------------------------------------------+
-             | assemble_working_context(token_budget=2000)           |
-             |  - Group by record type (Rules, Playbooks, History)   |
-             |  - Format retrieved content as delimited data blocks  |
-             |  - Preserve source references & validity conditions   |
-             +-------------------------------------------------------+
-                                         |
-                                         v
-             +-------------------------------------------------------+
-             | Assembled Working Memory (Sent to LLM)                |
-             +-------------------------------------------------------+
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s6_assemble_working_memory.png)
 
 Here is how the runtime builds that view in code:
 
@@ -786,44 +693,14 @@ To see what the assembled context might look like, imagine a subsequent cleanup 
 approved. The agent has discovered the staging instances and collected their current metrics. Its working memory now
 contains:
 
-```text
-CURRENT TASK
-  Run the weekly staging cost cleanup in staging-cloud.
-
-ACTIVE PROCEDURE (cleanup_idle_compute v2)
-  1. Inspect live utilization metrics across staging instances.
-  2. Check active constraints and scheduled batch workloads before stopping hosts.
-  3. Verify whether conditional exemptions have expired.
-
-ACTIVE SEMANTIC CONSTRAINTS (Retrieved Data)
-  - gpu-bench-01 [lifecycle_policy]
-    Keep running for Friday-night QA regression benchmarks.
-    Ends when: QA migrates its suite to the shared Kubernetes cluster.
-    Status: current | Authority: infra_lead
-    Source: trace://act_1043/message
-
-RELEVANT PAST EPISODES (Retrieved Data)
-  - [ep_act_1043 | completed]
-    Restarted gpu-bench-01 after the engineer reported that
-    the earlier shutdown broke QA's regression suite.
-    Source: trace://act_1043/message
-
-  - [ep_act_1042 | completed]
-    Stopped gpu-bench-01 after observing 0.2% average CPU
-    utilization over 72 hours.
-    Source: trace://act_1042/stop
-
-LIVE OBSERVATIONS (Current Turn)
-  - dev-sandbox-04: 0% utilization over 14 days.
-  - gpu-bench-01: Near-zero utilization, currently running.
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s6_agent_working_memory_example.png)
 
 Instead of feeding the model an entire conversation transcript or replaying the raw event log, the runtime hands it a
 compact, task-specific view: live metrics describe the current resource state, the semantic fact carries the standing
 restriction, the episodes explain how that restriction came about, and the procedure lays out the workflow for
 evaluating each host.
 
-### Treating Procedural Playbooks Like Versioned Code
+### Playbooks as Versioned Code
 
 The `ACTIVE PROCEDURE (cleanup_idle_compute v2)` block in the assembled prompt comes from procedural memory. Episodes
 track what happened during a specific attempt and semantic facts hold knowledge about particular resources, while
@@ -844,37 +721,7 @@ utilization before stopping an instance, repeated incidents with weekend batch j
 lesson shouldn't stay buried inside individual server histories; it belongs in the cleanup playbook so future runs check
 batch schedules and active exemptions across every host.
 
-```text
-+-------------------------------------+
-| 1. EXISTING PROCEDURE (v1)          |
-|    Identify and stop idle staging   |
-|    compute instances                |
-+-------------------------------------+
-                   |
-                   v
-+-------------------------------------+
-| 2. EPISODES / LESSONS LEARNED       |
-|    Scheduled workloads overlooked   |
-|    during resource cleanup          |
-+-------------------------------------+
-                   |
-                   v
-+-------------------------------------+
-| 3. CANDIDATE PROCEDURE UPDATE       |
-|    Check weekly batch schedules     |
-|    and active resource exemptions   |
-|    before stopping an instance      |
-+-------------------------------------+
-                   |
-                   v
-          Human Review & Approval
-                   |
-                   v
-+-------------------------------------+
-| 4. PUBLISHED PROCEDURE (v2)         |
-|    Approved and marked current      |
-+-------------------------------------+
-```
+![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s6_procedural_memory.png)
 
 This is where procedural memory differs from ordinary fact extraction. A background worker can safely record a
 resource-specific constraint from authorized feedback, but automatically rewriting a shared operational playbook is a
@@ -888,7 +735,7 @@ originally supplied by users, external tools, or ticket comments. Labeling recal
 instructions helps defend against delayed prompt injection, while permissions, scope boundaries, and tool authorization
 remain strictly enforced by the application runtime.
 
-## 7. The Payoff: Evaluating Memory on Decisions, Not Search Scores
+## 7. Did It Work? Judging Memory by Decisions
 
 Equipped with the assembled working context, here is how `CostGuard` handles the next cleanup run:
 
@@ -900,7 +747,7 @@ Equipped with the assembled working context, here is how `CostGuard` handles the
 Both instances look idle, but only one is safe to stop. You want to test that behavior, not just whether the
 memory system retrieved the right records.
 
-### Measuring Whether Your Memory Architecture Works
+### Measuring Decisions, Not Search Scores
 
 When teams evaluate agent memory, they often treat it like a standard search problem, measuring `recall@k` or cosine
 similarity on static question-answering benchmarks. Benchmarks like LongMemEval are helpful for testing retrieval and
@@ -928,7 +775,7 @@ Alongside decision accuracy, track operational metrics that search benchmarks mi
 prohibited action, how often it incorrectly blocks a valid one, whether it relies on superseded information, and how
 much latency memory retrieval adds to each turn.
 
-### Start Simple, Add Layers as Failures Justify Them
+### Start Simple, Add Layers
 
 You do not need to build every piece of this architecture on day one. If your agent runs single-session tasks with a
 small set of tools, a clean event log and a versioned playbook file will get you surprisingly far.
