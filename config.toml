@@ -35,7 +35,6 @@ canonifyurls = true
 [params]
   subtitle = ""
   brand = "Gelerion"
-  disqus = "Gelerion"
   dateFormat = "02 Jan 2006"
   favicon = "favicon.ico"
   mainSections = ["posts"]
@@ -46,11 +45,22 @@ canonifyurls = true
   wordCount = true
   #useHLJS = true
   socialShare = true
-  delayDisqus = true
   showRelatedPosts = true
 
   [params.search]
     provider = "fuse"   # navbar search overlay, backed by the home page JSON output
+
+  [params.giscus]
+    repo = "Gelerion/gelerion.github.io"
+    repoId = "MDEwOlJlcG9zaXRvcnkyMDk5NjA3Njk="
+    category = "Comments"
+    categoryId = "DIC_kwDODIO_Qc4DKpwT"
+    mapping = "pathname"
+    strict = "0"
+    reactionsEnabled = "1"
+    emitMetadata = "0"
+    inputPosition = "bottom"
+    theme = "preferred_color_scheme"
 
 [related]
   threshold = 80 # Lower score means more matches (default 80)
@@ -135,8 +145,6 @@ canonifyurls = true
       unsafe = true
       
 [services]
-  [services.disqus]
-    shortname = "Gelerion"
   [services.googleAnalytics]
     id = "G-962FFPME5F"
 
