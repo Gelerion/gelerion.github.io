@@ -4,7 +4,7 @@ date: 2026-11-07T08:00:00+02:00
 lastmod: 2026-11-07T08:00:00+02:00
 author: "Gelerion"
 series: [ "Agentic Harness 101" ]
-draft: true
+draft: false
 categories: [ "AI Engineering", "Software Engineering" ]
 summary: "Chat logs aren't memory. Learn how to build reliable long-term memory for AI agents: capture runtime events, consolidate them into episodes, extract and reconcile semantic facts, recall context progressively with hybrid search, and version procedural playbooks—all through a cleanup agent that keeps shutting down the wrong server."
 description: "Chat logs aren't memory. Build reliable long-term memory for AI agents with episodic, semantic, and procedural layers, progressive recall, and hybrid search."
