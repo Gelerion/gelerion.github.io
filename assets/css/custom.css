@@ -188,3 +188,26 @@ details > *:not(summary) {
     width: 100%;
   }
 }
+
+/* Wider table-of-contents drawer (theme default is 320px) */
+.toc-panel {
+  --bs-offcanvas-width: 440px;
+}
+
+/* Tags and "Read more" on one line in post previews
+   (layouts/_partials/post_preview.html) */
+.post-preview .post-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 10px;
+}
+
+.post-preview .post-footer .blog-tags {
+  margin-bottom: 0;
+}
+
+.post-preview .post-footer .post-read-more {
+  float: none;
+  margin-left: auto;
+}

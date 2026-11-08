@@ -4,7 +4,7 @@ date: 2023-07-09T19:00:53+03:00
 lastmod: 2023-07-09T20:00:00+03:00 
 author: "Gelerion"
 categories: ["Big Data", "Streaming"]
-summary: "Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting the exact number of distinct values can consume a significant amount of resources while taking a long time even when using a parallelized processing engine. To address this challenge, you can use probabilistic algorithms"
+summary: "Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting exact distinct values is slow and resource-hungry, even on a parallel engine like Spark. Probabilistic data sketches give you a fast, accurate-enough estimate instead."
 description: "Speed up Spark `count distinct` on big data. Learn how probabilistic Data Sketches (Theta/HLL) enable efficient cardinality estimation & faster ETL."
 tags: [
   "spark",

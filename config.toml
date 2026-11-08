@@ -2,18 +2,18 @@ baseURL = 'https://gelerion.github.io/'
 locale = 'en-us'
 title = 'Gelerion Blog'
 theme = 'beautifulhugo'
-description  = "Java, JVM performance, Streaming & AI engineering notes"
+description = "Notes on software architecture, distributed systems, and production AI engineering"
 keywords = [
-  "API design",
-  "REST",
-  "OpenTelemetry",
-  "observability",
-  "spark",
-  "data-sketches",
-  "streaming",
-  "analytics",
-  "maven",
-  "gpg"
+  "software architecture",
+  "AI agents",
+  "AI agent architecture",
+  "AI agent security",
+  "agent memory",
+  "RAG",
+  "LLM applications",
+  "data engineering",
+  "stream processing",
+  "observability"
 ]
 
 enableRobotsTXT = true 
@@ -27,13 +27,13 @@ canonifyurls = true
 [module.hugoVersion]
   min = "0.169.0"
 
-# With enableGitInfo, ":git" makes .Lastmod the commit date of the file
+# Lastmod follows the post date, so the theme hides "Last modified"
 [frontmatter]
-  lastmod = [":git", "lastmod", "date"]
+  lastmod = ["date"]
 
 
 [params]
-  subtitle = ""
+  subtitle = "Practical notes on software architecture, security, and AI engineering"
   brand = "Gelerion"
   dateFormat = "02 Jan 2006"
   favicon = "favicon.ico"
@@ -42,7 +42,8 @@ canonifyurls = true
 
   comments = true
   readingTime = true
-  wordCount = true
+  hideAuthor = true
+  wordCount = false
   #useHLJS = true
   socialShare = true
   showRelatedPosts = true
@@ -109,13 +110,18 @@ canonifyurls = true
     identifier = "posts"
     url = "/posts/"
   [[menu.main]]
+    name = "Series"
+    weight = 3
+    identifier = "series"
+    url = "/series/"
+  [[menu.main]]
     name = "Tags"
     weight = 4
     identifier = "tags"
     url = "/tags/"
   [[menu.main]]
     name = "About"
-    weight = 3
+    weight = 5
     identifier = "about"
     url = "/about/"
 

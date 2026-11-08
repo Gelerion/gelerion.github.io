@@ -6,7 +6,7 @@ author: "Gelerion"
 series: ["Pragmatic API Design"] 
 draft: false 
 categories: ["API Design", "Software Engineering"]
-summary: "Explore pragmatic API design principles in Part 1 of this series. Learn to balance REST best practices with real-world requirements, covering resource modeling, URL design, PUT vs. PATCH for updates, and handling business actions effectively"
+summary: "Explore pragmatic API design principles in Part 1 of this series. Learn to balance REST best practices with real-world requirements, covering resource modeling, URL design, PUT vs. PATCH for updates, and handling business actions effectively."
 description: "Explore pragmatic API design principles in Part 1 of this series. Learn to balance REST best practices with real-world requirements, covering resource modeling, URL design, PUT vs. PATCH for updates, and handling business actions effectively." 
 tags: [
     "API", 
