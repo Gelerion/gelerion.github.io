@@ -27,9 +27,10 @@ canonifyurls = true
 [module.hugoVersion]
   min = "0.169.0"
 
-# Lastmod follows the post date, so the theme hides "Last modified"
+# Use a hand-written `lastmod` when present; otherwise it falls back to the post
+# date, so the theme hides "Last modified" for posts that were never updated
 [frontmatter]
-  lastmod = ["date"]
+  lastmod = ["lastmod", "date"]
 
 
 [params]
