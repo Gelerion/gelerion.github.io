@@ -32,10 +32,9 @@ toc: true
 
 ## Introduction
 
-Collaboration is central to modern software engineering, and APIs are the critical interfaces that enable it –
-connecting frontends to backends, services to services, and businesses to partners. Designing an API often starts with
-familiar guidelines: model resources, use HTTP methods consistently, and keep URLs predictable. But things get more
-interesting when those guidelines meet real-world requirements.
+APIs are how frontends talk to backends, services talk to other services, and businesses talk to partners. Designing one
+often starts with familiar guidelines: model resources, use HTTP methods consistently, and keep URLs predictable.
+Things get more interesting when those guidelines meet real-world requirements.
 
 Should updating an account use `PUT` or `PATCH`? Is canceling an order just another status update, or should it have its
 own endpoint? Both questions seem straightforward until you start considering client expectations, business rules, and
@@ -87,9 +86,9 @@ Our product team has come up with a handful of user stories:
 * *"As a customer, I want to view the status of my order."*
 * *"As a customer, I want to cancel my order if it's not yet shipped."*
 
-Nothing particularly unusual so far. These requirements seem straightforward, and familiar REST conventions should help
-us get started. But as we'll discover, even a small set of requirements can lead to design choices that aren't quite as
-obvious as they first appear. Let's see how we can turn these stories into a practical API.
+These requirements look straightforward, and familiar REST conventions should get us started. Even so, a small set of
+requirements can lead to design choices that are less obvious than they first appear. Let's turn these stories into an
+API.
 
 ## Foundational Design: From User Needs to APIs
 
@@ -113,7 +112,7 @@ common mistake of simply exposing database tables.
 
 Next, define the shape of these resources based on the domain concept, acting as a contract with the consumer. What does
 an `Order` mean to a FlexiShop customer or frontend? It likely involves an `id`, `status`, `items summary`, and
-`total cost`. Crucially, it should **not** expose internal database fields (like `order_table_shard_id`) or
+`total cost`. It should **not** expose internal database fields (like `order_table_shard_id`) or
 implementation details. This abstraction shields consumers from internal complexity and allows the backend to evolve
 more freely.
 
@@ -129,8 +128,7 @@ compelling reason to introduce hypermedia.
 
 ### Keep It Minimal
 
-Minimalism is a core tenet of pragmatic design, applying equally to both the functionality your API offers and the data
-it exposes.
+Minimalism applies both to the functionality your API offers and to the data it exposes.
 
 On the functionality side, start by implementing only the endpoints and operations strictly necessary to fulfill the
 current, well-defined user stories or requirements. Don't build endpoints for features that *might* be needed someday.
@@ -140,11 +138,11 @@ those specific use cases. For the `Account` resource supporting registration and
 and `password` (for input only, never output!) are necessary. Resist adding fields for future possibilities ("Maybe
 users will want profile pictures later?").
 
-> 💡 **Remember!** Complexity costs – in development, testing, documentation, and maintenance.
+> **Remember:** Complexity has a cost in development, testing, documentation, and maintenance.
 
 ## Designing Clean URLs: Structure and Naming Matter
 
-With resources conceptually defined, we need to determine their addresses – the URL structure. How we structure these
+With resources conceptually defined, we need to determine their addresses, meaning the URL structure. How we structure these
 URLs significantly impacts usability and maintainability.
 
 ### URL Formatting: Use Kebab-Case
@@ -158,8 +156,8 @@ letters and hyphens (`-`, kebab-case) to separate words.
 (Note: Path parameters like `{productId}` or `{wishlistId}` often use camelCase for programming language compatibility,
 which is an acceptable distinction).
 
-**Rationale:** `kebab-case` is URL-safe, highly readable (hyphens remain visible when underlined), and a common web
-standard. This simple choice eliminates ambiguity and improves developer experience.
+**Rationale:** `kebab-case` is URL-safe, readable (hyphens remain visible when underlined), and a common web
+standard. Picking one convention removes any doubt about how to spell a path.
 
 ### Resource Relationships
 
@@ -185,7 +183,7 @@ However, `/accounts/{accountId}/orders` could still make sense when listing orde
 **Pragmatic Recommendation:** Keep URLs shallow unless the parent-child relationship is meaningful to the operation. One
 level of nesting is often enough, but it shouldn't be a hard rule.
 
-The goal isn't to eliminate nesting. It's to avoid making consumers navigate relationships they don't actually need.
+Nesting is fine where it helps. Just don't make consumers navigate relationships they don't actually need.
 
 ## Mapping User Stories to FlexiShop Endpoints
 
@@ -263,8 +261,8 @@ Content-Type: application/merge-patch+json
 }
 ```
 
-The server applies only these changes, leaving other fields like `email` untouched, which aligns perfectly with the
-user's intent.
+The server applies only these changes and leaves other fields like `email` untouched, which is what the user asked
+for.
 
 ### Modeling Business Actions
 
@@ -296,12 +294,12 @@ deviating from strict REST resource/noun-centric principles. And it increases th
 action requires its own endpoint, potentially increasing the total number of API endpoints.
 
 **Pragmatic Recommendation:** Despite the valid critiques of this second approach, favor **explicit action endpoints**
-(like `POST /resource/{id}/action`) for modeling complex business operations or commands. The significant gains in
-expressing clear intent, encapsulating complex business logic and side effects, and providing a distinct contract for
-the action typically outweigh the theoretical purity concerns or the manageable increase in the number of endpoints.
+(like `POST /resource/{id}/action`) for modeling complex business operations or commands. Clear intent,
+encapsulated business logic and side effects, and a distinct contract for the action usually outweigh the purity
+concerns and the extra endpoints.
 Reserve `PATCH` for its primary purpose: efficient and clear partial state modification of a resource's data fields.
 
-Our story – *"As a customer, I want to cancel my order if it's not yet shipped"* – involves business logic and rules. An
+Our story, *"As a customer, I want to cancel my order if it's not yet shipped"*, involves business logic and rules. An
 explicit action is clearer:
 
 ```http
@@ -335,27 +333,23 @@ Let's bring those decisions together. Here's what our first API looks like:
 | GET | `/v1/orders/{orderId}` | View the details and status of a specific order |
 | POST | `/v1/orders/{orderId}/cancel` | Initiate the process to cancel an existing order |
 
-These five endpoints cover our initial user stories without introducing functionality we don't yet need. We have a
-starting point for FlexiShop's API, shaped by customer requirements rather than REST conventions alone.
+These five endpoints cover our initial user stories without adding functionality we don't yet need. They are shaped by
+customer requirements, not just REST conventions.
 
-Of course, this is only the beginning. As FlexiShop grows, new requirements will bring new design challenges,
-particularly when we move beyond individual resources to collections, larger datasets, and production concerns.
+As FlexiShop grows, new requirements will bring new design challenges, particularly once we move beyond individual
+resources to collections, larger datasets, and production concerns.
 
 ## Conclusion
 
-We started with five fairly straightforward user stories for FlexiShop. Yet even these simple requirements led us to
-decisions where following REST conventions alone wasn't enough.
+We started with five fairly straightforward user stories for FlexiShop. Even these led to decisions where following REST
+conventions alone wasn't enough: we chose PATCH for partial account updates, added an explicit endpoint for order
+cancellation, and kept the resource model focused on what consumers actually need.
 
-We chose PATCH for partial account updates, introduced an explicit endpoint for order cancellation, and kept our
-resource model focused on what consumers actually need.
+Pragmatic API design means knowing the conventions well enough to tell when and why to adapt them. The aim is an API
+that's intuitive, consistent, and practical to work with, even if it isn't the most RESTful one possible.
 
-That's what pragmatic API design comes down to: understanding the conventions, but also knowing when and why to adapt
-them. The goal isn't to build the most RESTful API possible, but one that's intuitive, consistent, and practical to work
-with.
-
-Of course, we've only scratched the surface. So far, FlexiShop handles individual resources and a few basic operations.
-As the platform grows, we'll need to deal with collections, larger datasets, and the challenges of running an API in
-production.
+So far FlexiShop handles individual resources and a few basic operations. As the platform grows, we'll need to deal with
+collections, larger datasets, and the challenges of running an API in production.
 
 ### Coming Up Next
 
@@ -363,5 +357,3 @@ production.
    covering filtering strategies, pagination, and consistent sorting.
 2. **Part 3: Ensuring Robustness and Evolution:** We'll move into production concerns, including API versioning, rate
    limiting, idempotency for safe retries, and asynchronous operations.
-
-Stay tuned as we continue building the FlexiShop API using these pragmatic principles.
