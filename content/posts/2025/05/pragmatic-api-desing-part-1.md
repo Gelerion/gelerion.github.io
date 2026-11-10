@@ -1,7 +1,7 @@
 ---
 title: "Pragmatic API Design: Balancing Best Practices and Real-World Needs (Part 1)"
 date: 2025-05-05T08:00:00+03:00
-lastmod: 2025-05-05T08:00:00+03:00
+lastmod: "2026-11-10T08:00:00+02:00"
 author: "Gelerion"
 series: ["Pragmatic API Design"]
 draft: false
@@ -66,13 +66,12 @@ more sense.
 
 ## REST Fundamentals: A Quick Refresher
 
-* **Resource-Oriented:** Modeling our domain as resources (`/users`, `/orders`) provides a clear, understandable
-  structure
-* **Uniform Interface:** Using standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`), status codes, and media
-  types (`application/json`) creates consistency and predictability. Clients understand how to interact with resources
-  without prior knowledge of specific implementations.
-* **Statelessness:** Each request contains all necessary information; the server doesn't store client session state
-  between requests. This enhances scalability and reliability.
+REST comes down to three ideas. First, it is resource-oriented: modeling our domain as resources (`/users`, `/orders`)
+provides a clear, understandable structure. Second, it has a uniform interface: using standard HTTP methods (`GET`,
+`POST`, `PUT`, `DELETE`, `PATCH`), status codes, and media types (`application/json`) creates consistency and
+predictability, and clients understand how to interact with resources without prior knowledge of specific
+implementations. Third, it is stateless: each request contains all necessary information, and the server doesn't store
+client session state between requests, which enhances scalability and reliability.
 
 ## Meet FlexiShop: Our Running Example
 
@@ -99,9 +98,9 @@ user stories into resources that make sense to our consumers, rather than simply
 
 ### Start with User Stories to Identify Concepts
 
-Look at the FlexiShop stories we listed: "Register an account," "Modify account details," "Create an order," "View order
-status," "Cancel an order." These immediately point to the core domain objects our API must handle: likely an `Account`
-resource and an `Order` resource.
+Look at the FlexiShop stories we listed: `Register an account`, `Modify account details`, `Create an order`,
+`View order status`, `Cancel an order`. These immediately point to the core domain objects our API must handle: likely
+an `Account` resource and an `Order` resource.
 
 The verbs within these stories (`Register`, `Modify`, `Create`, `View`, `Cancel`) also highlight the primary actions the
 API needs to support. Also, the stories often hint at relationships between resources (e.g., an Order connects to an
@@ -133,12 +132,13 @@ compelling reason to introduce hypermedia.
 Minimalism is a core tenet of pragmatic design, applying equally to both the functionality your API offers and the data
 it exposes.
 
-* **Minimize Functionality:** Start by implementing only the endpoints and operations strictly necessary to fulfill the
-  current, well-defined user stories or requirements. Don't build endpoints for features that *might* be needed someday.
-* **Minimize Data Exposure:** Within the resources supporting this essential functionality, include only the fields
-  required for those specific use cases. For the `Account` resource supporting registration and updates, fields like
-  `email`, `name`, and `password` (for input only, never output!) are necessary. Resist adding fields for future
-  possibilities ("Maybe users will want profile pictures later?").
+On the functionality side, start by implementing only the endpoints and operations strictly necessary to fulfill the
+current, well-defined user stories or requirements. Don't build endpoints for features that *might* be needed someday.
+
+On the data side, within the resources supporting this essential functionality, include only the fields required for
+those specific use cases. For the `Account` resource supporting registration and updates, fields like `email`, `name`,
+and `password` (for input only, never output!) are necessary. Resist adding fields for future possibilities ("Maybe
+users will want profile pictures later?").
 
 > 💡 **Remember!** Complexity costs – in development, testing, documentation, and maintenance.
 
@@ -182,24 +182,17 @@ resource.
 
 However, `/accounts/{accountId}/orders` could still make sense when listing orders belonging to a particular account.
 
-#### Pragmatic Recommendation
-
-Keep URLs shallow unless the parent-child relationship is meaningful to the operation. One level of nesting is often
-enough, but it shouldn't be a hard rule.
+**Pragmatic Recommendation:** Keep URLs shallow unless the parent-child relationship is meaningful to the operation. One
+level of nesting is often enough, but it shouldn't be a hard rule.
 
 The goal isn't to eliminate nesting. It's to avoid making consumers navigate relationships they don't actually need.
 
 ## Mapping User Stories to FlexiShop Endpoints
 
-Let's translate our principles and the FlexiShop user stories into an initial API structure. As discussed, we start by
-identifying core concepts and actions directly from the user needs:
-
-* Stories like `Register an account`, `Create an order`, `View the status of my order` clearly point to `Account` and
-  `Order` concepts.
-* The verbs (`Register`, `Create`, `View`) suggest the required actions.
-
-Following standard REST practices and our guidelines (minimalism, resource-orientation, clear URLs), the most
-straightforward mappings for these initial stories are:
+Let's translate our principles and the FlexiShop user stories into an initial API structure. As discussed, the stories
+point to `Account` and `Order` concepts, and their verbs suggest the required actions. Following standard REST practices
+and our guidelines (minimalism, resource-orientation, clear URLs), the most straightforward mappings for these initial
+stories are:
 
 * Register Account: `POST /v1/accounts`
 * Create Order: `POST /v1/orders`
@@ -229,17 +222,13 @@ directions.
 > **The Conflict:** How should clients update an existing resource? REST offers two methods, `PUT` and `PATCH`, with
 > distinct semantics that often cause confusion.
 
-#### Option 1: Full Replacement with `PUT`
+The first option is `PUT`, which requires the client to send the **entire, complete** representation of the resource as
+it should exist after the update. If a client omits a field, the server typically interprets this as an intent to
+nullify or remove that field. `PUT` requests are expected to be idempotent.
 
-Requires the client to send the **entire, complete** representation of the resource as it should exist after the update.
-If a client omits a field, the server typically interprets this as an intent to nullify or remove that field. `PUT`
-requests are expected to be idempotent.
-
-#### Option 2: Partial Update with `PATCH`
-
-Designed for **partial updates**. The client sends only the fields they intend to change. This is often more
-network-efficient and safer, as it avoids accidental data loss for fields the client didn't intend to modify. To apply
-partial updates, servers need defined formats. Common standards include:
+The second option is `PATCH`, which is designed for **partial updates**. The client sends only the fields they intend to
+change. This is often more network-efficient and safer, as it avoids accidental data loss for fields the client didn't
+intend to modify. To apply partial updates, servers need defined formats. Common standards include:
 
 * `application/merge-patch+json` ([RFC 7396](https://datatracker.ietf.org/doc/html/rfc7396)): Simple. The patch body is
   a JSON object mirroring the resource structure; included fields replace existing values, explicitly null values
@@ -247,16 +236,11 @@ partial updates, servers need defined formats. Common standards include:
 * `application/json-patch+json` ([RFC 6902](https://datatracker.ietf.org/doc/html/rfc6902)): More powerful/complex. Uses
   a JSON array of explicit operations (add, remove, replace, etc.) for fine-grained control.
 
-#### Pragmatic Recommendation
-
-For most scenarios involving partial updates, prefer `PATCH` with `application/merge-patch+json` for its simplicity and
-safety against accidental data removal. It directly reflects the common intent of "change these specific fields."
-Reserve `PUT` for cases where replacing the entire resource state makes semantic sense (like uploading a file or
-replacing a complete configuration). Only use `application/json-patch+json` if the granular control operations are truly
-necessary.
-
-<details>
-<summary>FlexiShop Illustration: Updating Account Details</summary>
+**Pragmatic Recommendation:** For most scenarios involving partial updates, prefer `PATCH` with
+`application/merge-patch+json` for its simplicity and safety against accidental data removal. It directly reflects the
+common intent of "change these specific fields." Reserve `PUT` for cases where replacing the entire resource state makes
+semantic sense (like uploading a file or replacing a complete configuration). Only use `application/json-patch+json` if
+the granular control operations are truly necessary.
 
 Our story "As a registered user, I want to modify my account details..." clearly implies a partial update. `PATCH` is
 the better fit:
@@ -282,21 +266,17 @@ Content-Type: application/merge-patch+json
 The server applies only these changes, leaving other fields like `email` untouched, which aligns perfectly with the
 user's intent.
 
-</details>
-
 ### Modeling Business Actions
 
 > **The Conflict:** How do we represent operations that go beyond simple CRUD? Real-world applications involve commands,
 > processes, and complex business logic (e.g., cancel, approve, publish, submit) that don't always map cleanly to
 > modifying resource state alone.
 
-#### Option 1: Implicit Action via State Change
-
 One approach attempts to stay strictly within REST's resource-centric model by triggering actions through state changes,
 typically using `PATCH`. For example, canceling an order might be attempted via `PATCH /v1/orders/{orderId}` with a body
 like `{ "status": "canceled" }`.
 
-**Critique:** While theoretically pure for simple status changes, this often obscures intent and complexity:
+While theoretically pure for simple status changes, this often obscures intent and complexity:
 
 * **Hides Process:** The request doesn't explicitly invoke the "cancellation process" with its specific rules (e.g.,
   checking if shipped) and side effects (inventory adjustment, notifications).
@@ -305,31 +285,21 @@ like `{ "status": "canceled" }`.
 * **Implementation Burden:** The server's `PATCH` handler becomes complex, needing to differentiate simple state updates
   from action triggers.
 
-#### Option 2: Explicit Action Endpoints
-
 A more pragmatic approach uses endpoints that explicitly represent the action, often using `POST` on a nested URL
 segment. Common conventions include:
 
 * `POST /resource/{id}/action` (e.g., `/orders/{orderId}/cancel`)
 * `POST /resource/{id}:action` (e.g., `/orders/{orderId}:cancel`, used by Google APIs)
 
-**Critique:**
+This approach has two drawbacks. It goes against REST URL conventions: it introduces verb-like segments into URLs,
+deviating from strict REST resource/noun-centric principles. And it increases the number of endpoints: each distinct
+action requires its own endpoint, potentially increasing the total number of API endpoints.
 
-* **Against REST URL Conventions:** It introduces verb-like segments into URLs, deviating from strict REST
-  resource/noun-centric principles.
-* **Increases Number of Endpoints:** Each distinct action requires its own endpoint, potentially increasing the total
-  number of API endpoints.
-
-#### Pragmatic Recommendation
-
-Despite the valid critiques of Option 2, favor **explicit action endpoints** (like `POST /resource/{id}/action`) for
-modeling complex business operations or commands. The significant gains in expressing clear intent, encapsulating
-complex business logic and side effects, and providing a distinct contract for the action typically outweigh the
-theoretical purity concerns or the manageable increase in the number of endpoints. Reserve `PATCH` for its primary
-purpose: efficient and clear partial state modification of a resource's data fields.
-
-<details>
-<summary>FlexiShop Illustration: Cancelling an Order</summary>
+**Pragmatic Recommendation:** Despite the valid critiques of this second approach, favor **explicit action endpoints**
+(like `POST /resource/{id}/action`) for modeling complex business operations or commands. The significant gains in
+expressing clear intent, encapsulating complex business logic and side effects, and providing a distinct contract for
+the action typically outweigh the theoretical purity concerns or the manageable increase in the number of endpoints.
+Reserve `PATCH` for its primary purpose: efficient and clear partial state modification of a resource's data fields.
 
 Our story – *"As a customer, I want to cancel my order if it's not yet shipped"* – involves business logic and rules. An
 explicit action is clearer:
@@ -344,16 +314,11 @@ Authorization: Bearer <token>
 }
 ```
 
-**Why this is better:**
-
-* **Clear Intent:** Explicitly invokes the cancellation process.
-* **Encapsulates Logic:** Allows the backend handler to focus solely on cancellation rules (*Is it shipped? Adjust
-  inventory? Send notifications?*).
-* **Clearer Contract:** The endpoint signals the operation. The request body (optional) can carry action-specific
-  parameters. The response clearly confirms success or failure of the action (e.g., `409 Conflict` if already shipped,
-  `200 OK` or `204 No Content` on success).
-
-</details>
+This is clearer for three reasons. First, the intent is explicit: the request invokes the cancellation process directly.
+Second, the logic is encapsulated: the backend handler can focus solely on cancellation rules (*Is it shipped? Adjust
+inventory? Send notifications?*). Third, the contract is clearer: the endpoint signals the operation, the request body
+(optional) can carry action-specific parameters, and the response clearly confirms success or failure of the action
+(e.g., `409 Conflict` if already shipped, `200 OK` or `204 No Content` on success).
 
 ## Putting It Together: The First FlexiShop Endpoints
 
