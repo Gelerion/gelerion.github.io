@@ -1,10 +1,10 @@
 ---
-title: "Spark and Data Sketches: Taming count-distinct"
+title: "Distinct Counting at Scale: A Different Approach with DataSketches"
 date: 2023-07-09T19:00:53+03:00
-lastmod: 2023-07-09T20:00:00+03:00 
+lastmod: "2026-11-10T12:00:00+02:00"
 author: "Gelerion"
 categories: ["Big Data", "Streaming"]
-summary: "Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting exact distinct values is slow and resource-hungry, even on a parallel engine like Spark. Probabilistic data sketches give you a fast, accurate-enough estimate instead."
+summary: "Distinct counting becomes challenging when you need to aggregate results across different dimensions or time windows. Once unique counts are stored as plain numbers, information about overlapping values is lost. This post explores how Apache DataSketches and Spark help overcome that limitation using compact, mergeable sketches that enable flexible analytics without repeatedly processing raw data."
 description: "Speed up Spark `count distinct` on big data. Learn how probabilistic Data Sketches (Theta/HLL) enable efficient cardinality estimation & faster ETL."
 tags: [
   "spark",
@@ -25,91 +25,105 @@ keywords: [
 toc: true
 ---
 ## Introduction
-  
-Distinct counting is a commonly used metric in trend analysis to measure popularity or performance. Although it may seem like a simple problem, the challenge quickly grows as the amount of data grows. Counting the exact number of distinct values can consume a significant amount of resources while taking a long time even when using a parallelized processing engine. To address this challenge, you can use probabilistic algorithms
 
-## Probabilistic algorithms
-Probabilistic algorithms, such as [Data Sketches](https://datasketches.apache.org/), can be an excellent solution if the results can tolerate slight inaccuracies (with mathematically proven error bounds). Data Sketches is a collection of specialized algorithms known as streaming algorithms, or sketches. They suitable for both real-time and batch processing and has been specifically designed for production systems that must process massive data. 
+Counting unique users is one of the most common analytics questions, and one of the easiest pipelines to get stuck with.
+A daily job computes distinct users per ad and writes an integer to a table. Then someone asks for unique users per
+campaign, or per week, and the table can't answer. Distinct counts can't be added, because the same user may appear in
+several rows. The only way out is to go back to the raw events, which gets expensive as the data grows.
 
-A sketch is a construct that contains information about the distinct values in a dataset and has a fixed memory consumption. One of the most appealing aspects of sketches is that they can be merged and support set operators such as Union, Intersection, and Difference. This allows you to:
+The fix is to change what we store. With Apache DataSketches, we keep a compact, mergeable sketch of the underlying
+values instead of a final number. Sketches can be combined across dimensions and dates without touching the raw records.
+In exchange, we accept a small, bounded approximation error.
 
-- Incrementally update historical data by merging sketches with newly added data without needing to recalculate it with the raw data.
-- For interactive analysis, you can apply a dynamic filter or group by to further aggregate the sketch and quickly obtain approximate counts.
+The rest of this post builds that pipeline in Apache Spark for an advertising use case.
 
-For count-distinct purposes, there are two families of sketches: Theta Sketch and HyperLogLog Sketch.
+> 💡 **Update (2026):** I wrote this in July 2023, when Spark's approximate counting returned only a final number and
+> threw away the sketch. The examples use [`spark-sketches`](https://github.com/Gelerion/spark-sketches), a library I
+> built to store and merge sketches. Spark now supports DataSketches natively (HLL in 3.5, Theta in 4.1), so on a recent
+> runtime you can skip the library. The [last section](#running-this-on-modern-spark) has the function mapping.
 
-## Practical example: Online advertising campaign analysis
-In the digital advertising industry, understanding the effectiveness of online campaigns and accurately measuring unique user engagement is crucial for optimizing marketing strategies. 
+## How DataSketches Work
 
-Let's consider a scenario where a digital advertising agency is running multiple ad campaigns across various platforms and wants to assess the reach and engagement of each campaign. The agency collects data that includes user interactions with ads, such as ad impressions and clicks. 
+[Apache DataSketches](https://datasketches.apache.org/) summarizes a set into a lightweight binary data structure called
+a **sketch**. During ingestion, the sketch hashes each incoming value deterministically and keeps only a bounded,
+fixed-size statistical sample of those hashes. Because the same user ID always produces the exact same hash across every
+batch job, combining two sketches is just a matter of merging their samples. Overlapping users are deduplicated
+automatically, and the raw event logs stay untouched.
 
-> 💡 **Note:** In the context of online advertising, an impression refers to the display of an ad to a user on a website or app.
+If your reports can tolerate a small, bounded approximation error (typically around 1 to 2%), storing sketches instead
+of plain integers gives you two advantages:
 
-As a data engineer, you have been requested to calculate the following:
+* **Incremental historical updates:** we can summarize newly arrived data into a daily sketch and merge it directly with
+  historical sketches, without needing to recalculate over raw historical data.
+* **Dynamic rollups for interactive analysis:** we can pre-aggregate sketches at a fine granularity and later merge them
+  across coarser dimensions or arbitrary date ranges on the fly.
 
-1. Evaluating audience reach: By identifying the unique users who interacted with the ads, the agency can measure the audience reach and estimate the campaign's potential impact.
-2. Evaluating user engagement: By calculating the count of distinct users who clicked on the ads, the agency can analyze the effectiveness of the campaign in terms of user engagement.
+DataSketches provides several sketch families depending on your workload. Here we use Theta sketches, which support
+distinct counting as well as set operations like union, intersection, and difference. The pipeline below shows how they
+change both the daily ETL and the downstream reporting.
 
-These metrics should be aggregated daily to provide trend reports and insights into the effectiveness of the campaigns over time.
+## Practical Example: Advertising Analytics
 
-> 💡 **Note:** You can find the code here: [advertising-campaign-analysis](https://github.com/Gelerion/advertising-campaign-analysis)
-  
-## Building histroical layer
-  
-**Input**
-  
-Impressions and clicks events are continuously generated, streamed in real-time, and stored on Amazon S3. Events are bucketed by date in the `yyyy-mm-dd` format. To simplify the process, impressions and clicks are unified into a single stream. 
+> 💡 **Note:** You can find the code examples in the [companion
+> repository](https://github.com/Gelerion/advertising-campaign-analysis)
 
-```
+Suppose an advertising agency runs multiple campaigns, with several ads in each campaign. As users view and click those
+ads, events are collected and stored in a data lake.
+
+We want two reports:
+
+1. **Audience reach:** How many distinct users saw or interacted with each campaign?
+2. **User engagement:** How many distinct users clicked each ad, and how does that number change over time?
+
+The events are streamed in real time and stored on Amazon S3 as a unified stream partitioned by date:
+
+```scala
 s3/
-├─ streaming_event_data/
+└─ streaming_event_data/
    ├─ ...
    ├─ date=2023-05-17
    └─ date=2023-05-18
-
 ```
 
-**Schema**
-  
-| Column Name | Data Type | Description                                                |
-|-------------|-----------|------------------------------------------------------------|
-| ad_id       | String    | Unique identifier for each ad                              |
-| user_id     | String    | Unique identifier for each user                            |
-| campaign_id | String    | Unique identifier for each campaign                        |
-| click_id    | String    | Unique identifier for each ad click (nullable)             |
-| timestamp   | Timestamp | Timestamp indicating when the impression or click occurred |
+Each record in the [sample
+dataset](https://github.com/Gelerion/advertising-campaign-analysis/tree/main/data/streaming_event_data) follows this
+schema:
 
-> 💡 **Note:** Any event with a null value in `click_id` will be counted as an impression event
+| Column Name | Data Type | Description |
+| --- | --- | --- |
+| `ad_id` | String | Unique identifier for each ad |
+| `user_id` | String | Unique identifier for each user |
+| `campaign_id` | String | Unique identifier for each campaign |
+| `click_id` | String | Unique identifier for each ad click (`null` for impression events) |
+| `timestamp` | Timestamp | Timestamp indicating when the impression or click occurred |
 
-> 💡 **Note:** You can find the data example here: [streaming_event_data](https://github.com/Gelerion/advertising-campaign-analysis/tree/main/data/streaming_event_data)
-  
+## Building the Historical Layer
 
-### ETL: The naive way
-A daily batch job runs once every 24 hours to calculate daily aggregates from the streaming event data. This job loads the entire history of raw data and recomputes the reports every day.
-&nbsp;  
-&nbsp;  
-Here are the steps to perform:
-1. Read the complete history of streaming event data
+### ETL: Starting with Exact Counts
+
+In a conventional batch setup, a daily job reads the latest partition from the raw event stream, computes unique user
+counts per ad, and writes the aggregated rows to a historical Parquet table:
 
 ```scala
 val adEvents = spark.read
-      .option("basePath", "data/streaming_event_data")
-      .json("data/streaming_event_data/date=*")
+  .option("basePath", "data/streaming_event_data")
+  .json("data/streaming_event_data/date=2023-05-18")
 
 adEvents.createOrReplaceTempView("ad_events")
+
 /*
 +-----+-----------+--------+----------+-------+----------+
 |ad_id|campaign_id|click_id| timestamp|user_id|      date|
 +-----+-----------+--------+----------+-------+----------+
-|    1|         10|       1|1684366732|    939|2023-05-18|
-|   40|         10|       1|1684363771|      1|2023-05-18|
-|   35|         10|       1|1684374985|      1|2023-05-18|
+|    1|         10|   48101|1684366732|    939|2023-05-18|
+|   40|         10|   48102|1684363771|      1|2023-05-18|
+|   35|         10|   48103|1684374985|      1|2023-05-18|
 |   40|          8|   59030|1684416924|      1|2023-05-18|
 +-----+-----------+--------+----------+-------+----------+
 */
 ```
 
-2. Compute the aggregates for user engagement
+Then calculate the number of distinct users who clicked each ad on each day:
 
 ```sql
 SELECT date, campaign_id, ad_id, count(distinct user_id) AS unique_users
@@ -118,210 +132,277 @@ WHERE click_id IS NOT NULL
 GROUP BY date, campaign_id, ad_id
 ```
 
-3. Load the data into the data lake
+<details>
+<summary>Load the data into the data lake</summary>
 
 ```scala
-userEngagement
-  .write
+userEngagement.write
+  .mode("overwrite")
+  .option("partitionOverwriteMode", "dynamic")
   .partitionBy("date")
   .parquet("data/historical_data/user_engagement")
 ```
 
-> 💡 **Note:** For brevity, we will omit the audience reach report. The complete example can be found here: [CampaignAnalysisNaiveStrategy](https://github.com/Gelerion/advertising-campaign-analysis/blob/main/src/main/scala/com/gelerion/advertising/campaign/analysis/CampaignAnalysisNaiveStrategy.scala)
+</details>
 
-#### Drawbacks
-Although the ETL is very straightforward, it comes with a couple of drawbacks.  
-A major one is that count-distinct metrics are not cumulative. As a result, the entire history of raw data has to be loaded, combined and aggregated daily. Moreover, it is necessary to know beforehand the specific reports needed as grouping queries cannot be applied to pre-aggregated unique data. Finally, determining the exact count of distinct values can be a time-consuming and resource-intensive process.
+> 💡 **Note:** The audience reach report is omitted for brevity. The complete baseline implementation, including it, is in
+> [CampaignAnalysisNaiveStrategy](https://github.com/Gelerion/advertising-campaign-analysis/blob/main/src/main/scala/com/gelerion/advertising/campaign/analysis/CampaignAnalysisNaiveStrategy.scala).
 
-### ETL: Leveraging data-sketches
-To begin, include the Data Sketches library in your dependency management build:
+#### Where the exact-count breaks down
 
-```scala
+The pipeline is straightforward, but it has a limitation: distinct counts are not additive.
+
+When the same user clicks multiple ads within a campaign, they are correctly counted once per ad. But summing those
+counts would count that user multiple times. Once we've reduced each group to an integer, we lose the information needed
+to identify overlaps between groups.
+
+This means we cannot calculate unique users per campaign (dropping ad_id) or weekly unique users (aggregating across
+date) from our pre-aggregated table alone.
+
+Instead, we must either precompute every reporting combination we anticipate or return to the raw events whenever we
+need a different aggregation.
+
+### ETL: Replacing Counts with Sketches
+
+To avoid returning to raw events, we can change our daily job to store a binary Theta Sketch instead of a flat integer.
+
+<details>
+<summary>Setup: add the spark-sketches dependency and register the functions</summary>
+
+```xml
 <dependency>
    <groupId>com.gelerion.spark.sketches</groupId>
    <artifactId>spark-sketches</artifactId>
    <version>1.0.0</version>
 </dependency>
+
 ```
 
-> 💡 **Note:** You can find the source and the Spark versions compatibility matrix here: [spark-sketches](https://github.com/Gelerion/spark-sketches)
+> 💡 **Note:** You can find the source code and the Spark version compatibility matrix here:
+> [spark-sketches](https://github.com/Gelerion/spark-sketches)
 
-To use new functions in SQL queries, you will also have to register them. This only needs to be done once.
+To use the sketch functions in Spark SQL queries, register them once on your `SparkSession`:
 
 ```scala
 import org.apache.spark.sql.registrar.SketchFunctionsRegistrar
 SketchFunctionsRegistrar.registerFunctions(spark)
 ```
-  
-Sketches enable incremental updates to historical data by merging them with newly added data, without the need to recalculate the entire history. Moreover, since sketches support set operators, we can further aggregate them by applying dynamic filters and/or grouping by different dimensions, to quickly obtain approximate counts.
-&nbsp;  
-&nbsp;  
-Here are the steps to perform:
-1. Read **one day** of streaming event data
 
-```scala
-val adEvents = spark.read
-      .option("basePath", "data/streaming_event_data")
-      .json("data/streaming_event_data/date=2023-05-20")
-
-adEvents.createOrReplaceTempView("ad_events")
-```
-
-2. Compute the aggregates for user engagement 
+</details>
 
 ```sql
-SELECT date, campaign_id, ad_id, theta_sketch_build(user_id) AS unique_users
+SELECT date, campaign_id, ad_id, 
+       theta_sketch_build(user_id) AS unique_users
 FROM ad_events
 WHERE click_id IS NOT NULL
 GROUP BY date, campaign_id, ad_id
 ```
 
-Here is where the magic happens: instead of performing a `count distinct` calculation, you can use the `theta_sketch_build` function to generate a Theta Sketch. Sketches have a fixed size and are stored in binary format. Alternatively, you can use the `hll_sketch_build` function if you prefer to use an HLL sketch.
-&nbsp;  
-&nbsp;  
+The query looks almost identical to the exact-count version. The difference is the value we keep in `unique_users`:
+instead of a number, `theta_sketch_build` returns a serialized Theta Sketch summarizing the distinct user IDs in that
+group.
 
-3. Load one day of aggregated data into the data lake
+### Persisting Daily Sketches
+
+Store the daily aggregates as partitioned Parquet files:
 
 ```scala
-userEngagement
-  .write
+userEngagement.write
+  .mode("overwrite")
+  .option("partitionOverwriteMode", "dynamic")
   .partitionBy("date")
   .parquet("data/historical_data/user_engagement")
 ```
 
-As simple as that!
+Dynamic partition overwrite matters here. Since the DataFrame holds one day's results, Spark replaces only the
+partitions present in the output and leaves other dates untouched, so history isn't scanned or rewritten each time a
+daily aggregate lands. Without this mode, a rerun can overwrite more of the history than intended. The companion project
+sets it at the Spark-session level; the option above makes it explicit at the write site.
 
-> 💡 **Note:** The complete example can be found here: [CampaignAnalysisSketchesStrategy](https://github.com/Gelerion/advertising-campaign-analysis/blob/main/src/main/scala/com/gelerion/advertising/campaign/analysis/CampaignAnalysisSketchesStrategy.scala)
+<details>
+<summary>Production notes: late data, deletions and object stores</summary>
 
-## Exploring historical data
-Data lake layout:
+* Late-arriving events: this example rebuilds a complete daily partition from that day's events. For late data, either
+  rebuild the affected day or merge incoming sketches with the existing day's state. Overwriting a partition with a
+  partial batch would lose earlier data.
+* Deletions and corrections: sketch union handles duplicates, but it can't generally retract a user who must be deleted
+  or correct arbitrary past events. Those cases can require rebuilding from source data.
+* Object stores: plain Parquet overwrites aren't transactional. On S3 or another object store, use a compatible
+  committer or a transactional table format if readers need reliable, atomic updates.
 
-```
-s3/
-└─ historical_data/
-	└─ user_engagement/
-	    ├─ ...
-	    ├─ date=2023-05-17
-	    └─ date=2023-05-18
-				└─ data_part_1.parquet
-				└─ data_part_2.parquet
-				└─ ...
-```
+</details>
 
-As you can see the historical data is in the Parquet format, bucketed by date, and split into partitions. This allows queries to scan only a specific range of data when filtering by dates.
+## Querying the Historical Data
 
-> 💡 **Tip:** When loading data into a data lake, consider ordering it by the most frequently used dimensions in queries. This can improve scan efficiency even further.
+After a few daily runs, the table is just Parquet files partitioned by date. Each row holds a `campaign_id`, an `ad_id`
+and a sketch in place of a number. Because the partitions are by date, a query with a date filter only reads the days it
+needs.
 
-Let's review the aggregated schema:
+<details>
+<summary>Historical data layout</summary>
 
 ```scala
-DESC user_engagement_historical;
-
-+------------+-----------+-------+
-|col_name    |data_type  |comment|
-+------------+-----------+-------+
-|campaign_id |bigint     |null   |
-|ad_id       |bigint     |null   |
-|unique_users|thetasketch|null   |
-|date        |date       |null   |
-+------------+-----------+-------+
+historical_data/
+  user_engagement/
+    date=2023-05-17/
+      part-....parquet
+    date=2023-05-18/
+      part-....parquet
+    date=2023-05-19/
+      part-....parquet
+    ...
 ```
 
-Upon reviewing the files, an interesting detail comes to light: the `unique_users` column is of a new type called `thetasketch`. It is is an alias for the built-in binary type and provides runtime safety, preventing the merging of sketches of different types.
+</details>
 
-## Building dashboards: User Engagement
+```scala
+spark.read.parquet("data/historical_data/user_engagement")
+  .createOrReplaceTempView("user_engagement")
+```
 
-Now that you have the ETL process up and running, let's move on to addressing the business requirements: analyzing the effectiveness of the campaign in terms of user engagement. 
+### Unique Users per Ad, per Day
 
-> 💡 **Note:** To provide greater flexibility for businesses to gain insights, it is important to keep historical data as detailed as possible. We have aggregated reports that include date, campaign id, and even ad id.
-
-> 💡 **Note:** The example is based on mock, auto-generated data.
-
-> 💡 **Note:** Please find the complete example here: [advertising-campaign-analysis](https://github.com/Gelerion/advertising-campaign-analysis/blob/main/src/main/scala/com/gelerion/advertising/campaign/analysis/reports/UserEngagementReport.scala)
-
-### The user engagement for each ad per day
-Let's start with something simple and create a report that doesn't require grouping the data. This report demonstrates you how to leverage the `theta_sketch_get_estimate` function to retrieve actual values from the sketch.
+For each row, `theta_sketch_get_estimate` extracts the approximate distinct-user count from the stored sketch:
 
 ```sql
-SELECT date, campaign_id, ad_id, theta_sketch_get_estimate(unique_users) as unique_users
+SELECT date, campaign_id, ad_id,
+       theta_sketch_get_estimate(unique_users) AS unique_users
 FROM user_engagement
-WHERE campaign_id = $campaignIdToAnalyze
-ORDER BY date, ad_id, unique_users DESC
+WHERE campaign_id = 1
+ORDER BY date, ad_id;
 ```
 
-Output:
+The original sample data yields results such as:
 
-```
+```sql
 +----------+-----------+-----+------------+
-|      date|campaign_id|ad_id|unique_users|
+| date     |campaign_id|ad_id|unique_users|
 +----------+-----------+-----+------------+
 |2023-05-17|          1|    1|         889|
 |2023-05-17|          1|    2|          52|
 |2023-05-17|          1|    3|          36|
 |2023-05-17|          1|    4|          38|
-+----------+-----------+-----+------------+ 
++----------+-----------+-----+------------+
 ```
 
-### Top two ads with the highest user engagement per day
+Those values are estimates from the sketches. At small cardinalities, a Theta sketch may still be in exact mode; as
+cardinality grows beyond its configured capacity, sampling introduces estimation error.
 
-Let's take it up a notch and choose the two most successful ads per day. This report demonstrates how you can use theta sketch functions for advanced analytics with window functions.
+### Top Two Ads by Daily Engagement
+
+Once the estimate is extracted, it's an ordinary number, so any SQL works on top of it. For example, a window function
+can find the two ads with the highest estimated reach each day:
 
 ```sql
-WITH ordered_user_engagement as (
-  SELECT date, campaign_id, ad_id, theta_sketch_get_estimate(unique_users) as unique_users,
-         RANK() OVER (PARTITION BY date ORDER BY theta_sketch_get_estimate(unique_users) DESC) as topN
+WITH engagement AS (
+  SELECT date, ad_id,
+         theta_sketch_get_estimate(unique_users) AS estimated_users
   FROM user_engagement
-  WHERE campaign_id = $campaignIdToAnalyze
+  WHERE campaign_id = 1
+), ranked AS (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY date
+           ORDER BY estimated_users DESC
+         ) AS position
+  FROM engagement
 )
-SELECT date, campaign_id, ad_id, unique_users
-FROM ordered_user_engagement
-WHERE topN <= 2
-ORDER BY date, ad_id, unique_users DESC
+SELECT date, ad_id, estimated_users
+FROM ranked
+WHERE position <= 2
+ORDER BY date, position;
 ```
 
-Output:
+The rankings are based on approximate rather than exact user counts, so closely ranked ads may swap positions within the
+sketch's error range.
 
-```
-+----------+-----------+-----+------------+
-|      date|campaign_id|ad_id|unique_users|
-+----------+-----------+-----+------------+
-|2023-05-17|          1|    1|         889|
-|2023-05-17|          1|   40|         473|
-|2023-05-18|          1|    1|        1683|
-|2023-05-18|          1|   40|         890|
-|2023-05-19|          1|    1|        1336|
-|2023-05-19|          1|   40|         772|
-+----------+-----------+-----+------------+
-```
+### Daily Engagement Across the Entire Campaign
 
-### The daily trend for user engagement per campaign
-Sketches are particularly useful when you need to group values while dropping dimensions. Summing distinct values over aggregated data is not possible, but it is certainly achievable with sketches. This report shows you how to use the `theta_sketch_merge` function to merge sketches.
+We no longer need the ad-level dimension, but we can't simply sum the per-ad unique-user estimates. Instead, we merge
+the sketches first. Here are both calculations side by side:
 
 ```sql
-SELECT date, campaign_id, theta_sketch_get_estimate(theta_sketch_merge(unique_users)) as unique_users
+SELECT date, campaign_id,
+       SUM(theta_sketch_get_estimate(unique_users)) AS sum_of_ads,
+       theta_sketch_get_estimate(
+         theta_sketch_merge(unique_users)
+       ) AS unique_users
 FROM user_engagement
-WHERE campaign_id = $campaignIdToAnalyze
+WHERE campaign_id = 1
 GROUP BY date, campaign_id
-ORDER BY date, unique_users DESC
+ORDER BY date;
 ```
 
-Output:
-
-```
-+----------+-----------+------------+
-|      date|campaign_id|unique_users|
-+----------+-----------+------------+
-|2023-05-17|          1|        2397|
-|2023-05-18|          1|        4070|
-|2023-05-19|          1|        3479|
-+----------+-----------+------------+
+```sql
++----------+-----------+----------+------------+
+| date     |campaign_id|sum_of_ads|unique_users|
++----------+-----------+----------+------------+
+|2023-05-17|          1|      3112|        2397|
+|2023-05-18|          1|      5386|        4070|
+|2023-05-19|          1|      4623|        3479|
++----------+-----------+----------+------------+
 ```
 
-## Conclusion
-In this article, you have learned how to create an efficient ETL process that tackles the difficulties of generating count-distinct reports over massive data. Additionally, you have seen an example of merging raw and historical data without the need to re-aggregate it and efficiently responding to count-distinct queries on the aggregated data.
+`sum_of_ads` counts a user once for every ad they clicked. `unique_users` counts each user once per campaign. The gap
+between the two columns is the overlap, which the merged sketches account for without touching the raw clickstream.
 
-As you can see, Data Sketches can be a powerful tool in your arsenal, and the [spark-sketches](https://github.com/Gelerion/spark-sketches) library helps you to seamlessly integrate them into Spark workflows.
-   
-**Stay tuned**  
-In the second part, you will learn how to stream aggregated data to Druid for interactive analysis in near real time. 
+We can also drop the date dimension to estimate reach over a longer period:
+
+```sql
+SELECT campaign_id,
+       theta_sketch_get_estimate(
+         theta_sketch_merge(unique_users)
+       ) AS unique_users
+FROM user_engagement
+WHERE campaign_id = 1
+  AND date BETWEEN '2023-05-17' AND '2023-05-19'
+GROUP BY campaign_id;
+```
+
+This answers a new question from the historical aggregates alone, without reading the original click events.
+
+If you maintain cumulative month-to-date or all-time summary tables, your daily job can merge yesterday's cumulative
+sketch with today's new daily sketch, which keeps daily processing cost flat regardless of how much history you
+accumulate.
+
+## Theta vs. HyperLogLog
+
+The examples above use Theta sketches. `spark-sketches` also supports HyperLogLog (HLL), and the choice comes down to
+which questions you need to answer later.
+
+If you only need counts and rollups, use HLL. It's built for cardinality estimation and unions, and it's much smaller
+than a Theta sketch of comparable accuracy. For "unique users per campaign, per week", it's usually the most
+storage-efficient option.
+
+If you need to compare audiences, use Theta. It's larger than HLL, often by roughly an order of magnitude at typical
+settings. In exchange, it supports intersection (`A ∩ B`) and difference (`A \ B`), not just union. In our pipeline,
+storing Theta sketches for both impressions and clicks lets you ask:
+
+* Who saw an ad but never clicked? (`Impressions \ Clicks`)
+* Who engaged with both Campaign A and Campaign B? (`Campaign A ∩ Campaign B`)
+
+All of that comes from the pre-aggregated table, without going back to the raw events.
+
+## Running This on Modern Spark
+
+The pattern is the same on Spark 4.1+, with different function names:
+
+| spark-sketches | Spark 4.1+ |
+| --- | --- |
+| `theta_sketch_build` | `theta_sketch_agg` |
+| `theta_sketch_merge` | `theta_union_agg` |
+| `theta_sketch_get_estimate` | `theta_sketch_estimate` |
+
+Don't assume sketches written by one implementation can be read by the other. Check format compatibility before mixing
+them.
+
+## Final Thoughts
+
+Distinct counts stop being a dead end once we store sketches instead of numbers. The daily job barely changes: one
+function swap in the query and a binary column in Parquet. In return, the same historical table can answer per-ad,
+per-campaign and per-week questions, and with Theta sketches it can also answer intersection and difference questions,
+all without reading the raw events again.
+
+The price is a small, bounded approximation error, and sketches that take more space than a plain integer. For reach and
+engagement reporting, that is usually a good trade.
   

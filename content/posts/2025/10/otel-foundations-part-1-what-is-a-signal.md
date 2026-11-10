@@ -33,17 +33,22 @@ slug: "otel-foundations-part-1-what-is-a-signal"
 
 ## Back to Basics — What Is an OTel Signal?
 
-When people hear about OpenTelemetry (OTel), they often think of dashboards: latency charts, flame graphs, service maps. But OTel itself isn’t a dashboard, and it’s not “observability” in the marketing sense either. At its core, OpenTelemetry is simply a way for your code to produce **structured data objects** about what it’s doing.
+When people hear about OpenTelemetry (OTel), they often think of dashboards: latency charts, flame graphs, service maps.
+But OTel itself isn’t a dashboard, and it’s not “observability” in the marketing sense either. At its core,
+OpenTelemetry is simply a way for your code to produce **structured data objects** about what it’s doing.
 
 Those objects are called **signals**, and there are three of them: **traces, metrics, and logs**.
 
-That’s it. Everything else — collectors, backends, fancy vendor UIs — is built on top of these building blocks. If you don’t understand signals, you’re just poking at pretty graphs without knowing what’s underneath.
+That’s it. Everything else — collectors, backends, fancy vendor UIs — is built on top of these building blocks. If you
+don’t understand signals, you’re just poking at pretty graphs without knowing what’s underneath.
 
-> **Outcome:** In this post we'll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors. Just the SDK, creating and printing raw signals from your app.
+> **Outcome:** In this post we'll strip away the layers. No auto-instrumentation, no vendor dashboards, no collectors.
+> Just the SDK, creating and printing raw signals from your app.
 
 ---
 
-> 💡 **Prefer hands-on learning?** All examples in this post come from a working Java project with manual instrumentation, and best practices baked in. Clone it, run it, and explore OpenTelemetry without the magic:  
+> 💡 **Prefer hands-on learning?** All examples in this post come from a working Java project with manual
+> instrumentation, and best practices baked in. Clone it, run it, and explore OpenTelemetry without the magic:
 > 👉 [OTel Playground on GitHub](https://github.com/Gelerion/otel-playground)
 
 ---
@@ -60,9 +65,12 @@ These three signals form the foundation of observability. Let's start with the o
 
 ## Spans: Timed Units of Work
 
-The first and most important signal is the **span**. A span represents a single, timed unit of work. It could be an HTTP request, a database query, or a background task.
+The first and most important signal is the **span**. A span represents a single, timed unit of work. It could be an HTTP
+request, a database query, or a background task.
 
-What makes spans interesting is not just that they measure how long something took, but that they carry *context*. A span is a data structure that captures the duration of an operation, its outcome, and metadata describing what was happening.
+What makes spans interesting is not just that they measure how long something took, but that they carry *context*. A
+span is a data structure that captures the duration of an operation, its outcome, and metadata describing what was
+happening.
 
 Under the hood, a span is just a structured object with a few key parts:
 
@@ -117,7 +125,8 @@ When the span ends, you’ll see something like this:
 <summary>See full details and example output</summary>
 
 **Try it yourself:**  
-👉 [Otel-Playground Repository](https://github.com/Gelerion/otel-playground/blob/blog-exmaples/src/main/java/com/gelerion/otel/playground/examples/SpanExample.java)
+👉 [Otel-Playground
+Repository](https://github.com/Gelerion/otel-playground/blob/blog-exmaples/src/main/java/com/gelerion/otel/playground/examples/SpanExample.java)
 
 **Full OTLP Example:**
 
@@ -196,10 +205,13 @@ When the span ends, you’ll see something like this:
 
 ### Attributes vs. Events: Clearing the Confusion
 
-A common early question is: what's the difference between attributes and events? On the surface they both look like "extra details," but they capture very different kinds of information.
+A common early question is: what's the difference between attributes and events? On the surface they both look like
+"extra details," but they capture very different kinds of information.
 
-* **Attributes** describe what the span *is* — metadata that applies for the whole duration: the HTTP method, the database system, or the user role. Once set, they don't change
-* **Events** describe what *happens* during the span — timestamped points on the timeline like "controller started," "query executed," "cache miss"
+* **Attributes** describe what the span *is* — metadata that applies for the whole duration: the HTTP method, the
+  database system, or the user role. Once set, they don't change
+* **Events** describe what *happens* during the span — timestamped points on the timeline like "controller started,"
+  "query executed," "cache miss"
 
 **Mental model:** attributes are like columns in a database table; events are like rows in a log table.
 
@@ -212,13 +224,15 @@ Spans capture what logs and metrics can't: the **timeline and causality** of a r
 * Propagation makes them **distributed** — connect the dots across services
 * Status codes enable **debugging** — identify which requests failed and where
 
-The cost: spans require careful lifecycle management (always end them) and thoughtful attribute selection (avoid unbounded values). But when done right, they become the foundation for understanding distributed system behavior.
+The cost: spans require careful lifecycle management (always end them) and thoughtful attribute selection (avoid
+unbounded values). But when done right, they become the foundation for understanding distributed system behavior.
 
 ---
 
 ## Metrics: The System’s Pulse
 
-If spans are the story of individual requests, metrics are the pulse of your whole system. They don’t describe a single event, but patterns and trends over time.
+If spans are the story of individual requests, metrics are the pulse of your whole system. They don’t describe a single
+event, but patterns and trends over time.
 
 Metrics answer questions like:
 
@@ -231,7 +245,8 @@ Metrics answer questions like:
 OpenTelemetry defines several metric instruments, but in practice two are most important:
 
 * **Counter** — always increases; good for counts: requests, errors, bytes sent
-* **Histogram** — captures a distribution of values; perfect for latency, payload sizes, or anything where the spread matters
+* **Histogram** — captures a distribution of values; perfect for latency, payload sizes, or anything where the spread
+  matters
 
 ```java
 Meter meter = GlobalOpenTelemetry.getMeter("demo");
@@ -272,18 +287,25 @@ Conceptually printed output might look like:
 
 Averages are comforting, but misleading.
 
-Imagine 99% of your requests finish in 50 ms, but 1% take 5 seconds. The average might still look “fine” at 100 ms, but users experiencing the 5-second requests are not happy.
+Imagine 99% of your requests finish in 50 ms, but 1% take 5 seconds. The average might still look “fine” at 100 ms, but
+users experiencing the 5-second requests are not happy.
 
-Histograms let you see the full distribution. They show you the 95th and 99th percentiles, where performance problems hide.
+Histograms let you see the full distribution. They show you the 95th and 99th percentiles, where performance problems
+hide.
 
-Percentiles are not magic either. Saying “p95 latency is 2 seconds” means 5% of requests take longer than 2s — which could still be thousands of slow requests per minute.
+Percentiles are not magic either. Saying “p95 latency is 2 seconds” means 5% of requests take longer than 2s — which
+could still be thousands of slow requests per minute.
 
 
 ### Histograms: Buckets Today, Exponential Tomorrow
 
-Histograms in OTel (and Prometheus) are bucket-based: you define boundaries like 0.1s, 0.5s, 1s, and each recorded value falls into a bucket.
+Histograms in OTel (and Prometheus) are bucket-based: you define boundaries like 0.1s, 0.5s, 1s, and each recorded value
+falls into a bucket.
 
-> 💡 **Note:** Dropwizard users may be familiar with reservoir histograms that estimate percentiles from samples. Those work in a single process but **can't be aggregated across services**—you can't meaningfully combine p95 from Service A and p95 from Service B. Bucket histograms solve this: each service sends bucket counts, and the backend merges them correctly.
+> 💡 **Note:** Dropwizard users may be familiar with reservoir histograms that estimate percentiles from samples. Those
+> work in a single process but **can't be aggregated across services**—you can't meaningfully combine p95 from Service A
+> and p95 from Service B. Bucket histograms solve this: each service sends bucket counts, and the backend merges them
+> correctly.
 
 Choosing good bucket boundaries is one of the most common and subtle performance tuning decisions in observability.
 Too few buckets, and you lose visibility. Too many, and your metrics backend drowns in noise.
@@ -325,7 +347,8 @@ http.requests{method="GET", route="/checkout"}
 http.requests{method="POST", route="/login"}
 ```
 
-Add an attribute like `user.id`, and suddenly you have a series for every user. This is how teams unintentionally blow up Prometheus clusters.
+Add an attribute like `user.id`, and suddenly you have a series for every user. This is how teams unintentionally blow
+up Prometheus clusters.
 
 Best practice: keep attributes bounded (HTTP method, status code) and avoid unbounded ones (user IDs, request IDs).
 
@@ -344,9 +367,11 @@ With metrics, you can catch the trend early and prove SLO compliance ("99.9% of 
 
 ## Logs: Human Context, Structured
 
-Most developers are already familiar with logs. They’re the oldest tool in the toolbox: print something, look at it later. Logs are human-readable, but often unstructured.
+Most developers are already familiar with logs. They’re the oldest tool in the toolbox: print something, look at it
+later. Logs are human-readable, but often unstructured.
 
-OpenTelemetry doesn’t replace logging frameworks like Log4j or SLF4J. You’ll still use them. What OTel adds is structure and correlation.
+OpenTelemetry doesn’t replace logging frameworks like Log4j or SLF4J. You’ll still use them. What OTel adds is structure
+and correlation.
 
 An OTel log record contains:
 
@@ -389,7 +414,8 @@ Conceptually printed:
 
 ### OTel Logs Are Not a Logger Replacement
 
-It’s worth repeating: OpenTelemetry does not replace your logger. You’ll still write `logger.info("...")` as always. The difference is that with an OTel appender or bridge, those logs can carry structure and correlation data automatically.
+It’s worth repeating: OpenTelemetry does not replace your logger. You’ll still write `logger.info("...")` as always. The
+difference is that with an OTel appender or bridge, those logs can carry structure and correlation data automatically.
 
 <details>
 <summary>Example log4j2.xml configuration</summary>
@@ -456,12 +482,14 @@ logger.info("Handled request, traceId={} spanId={}",
 
 That way, your logs can be linked back to traces later in Loki, Splunk, or Elasticsearch.
 
-This is a pragmatic middle ground: your team keeps its logging setup, but you gain the ability to correlate logs with traces.
+This is a pragmatic middle ground: your team keeps its logging setup, but you gain the ability to correlate logs with
+traces.
 
 
 ### Why Logs Matter
 
-Logs remain the most human-friendly signal. They tell the story in plain language, but with OTel, they also become structured and correlated. That means you can search them, filter them, and tie them directly to traces and metrics.
+Logs remain the most human-friendly signal. They tell the story in plain language, but with OTel, they also become
+structured and correlated. That means you can search them, filter them, and tie them directly to traces and metrics.
 
 ---
 
@@ -469,7 +497,9 @@ Logs remain the most human-friendly signal. They tell the story in plain languag
 
 Spans, metrics, and logs are valuable on their own, but the real power comes from the context that ties them together.
 
-When you start a span, OTel creates a context containing a TraceId and SpanId. While that span is active, any metrics you record or logs you emit can carry the same IDs. Across services, the `traceparent` header (defined by the W3C Trace Context specification) propagates that context.
+When you start a span, OTel creates a context containing a TraceId and SpanId. While that span is active, any metrics
+you record or logs you emit can carry the same IDs. Across services, the `traceparent` header (defined by the W3C Trace
+Context specification) propagates that context.
 
 <details>
 <summary>The `traceparent` header example</summary>
@@ -479,7 +509,8 @@ The `traceparent` header looks like this:
 traceparent: 00-4f9c0b9a2b8b4f6ea4c1d8c7e3f2a1b0-a1b2c3d4e5f67890-01
 ```
 
-It contains the version, trace ID, parent span ID, and trace flags. When Service A calls Service B, this header travels along, allowing Service B to create child spans that belong to the same trace.
+It contains the version, trace ID, parent span ID, and trace flags. When Service A calls Service B, this header travels
+along, allowing Service B to create child spans that belong to the same trace.
 
 </details>
 
@@ -499,9 +530,12 @@ Imagine this scenario:
 1. Your dashboard shows **p95 latency spiking** from 200ms to 3s (metrics signal)
 2. You drill into traces and find several slow spans for `POST /checkout` (trace signal)
 3. Inside one span, you see a child span: `inventory.check` that took 2.8s
-4. You jump to logs filtered by that span's trace ID and find: `ERROR: inventory service timeout after 2.8s` (log signal)
+4. You jump to logs filtered by that span's trace ID and find: `ERROR: inventory service timeout after 2.8s` (log
+   signal)
 
-Without unified context, you'd be jumping between three different tools, manually correlating timestamps and request IDs. With OTel providing correlation, your observability backend can link these signals directly — what took minutes of manual correlation now takes seconds.
+Without unified context, you'd be jumping between three different tools, manually correlating timestamps and request
+IDs. With OTel providing correlation, your observability backend can link these signals directly — what took minutes of
+manual correlation now takes seconds.
 
 </details>
 
@@ -520,7 +554,8 @@ With three signals at your disposal, how do you decide which to use? Here's a pr
 | Track request flow across services | Spans | Distributed trace showing all hops |
 | Get human-readable context | Logs | "User 123 failed authentication: invalid token" |
 
-In practice, you'll use all three together. Metrics alert you to problems, traces help you locate them, and logs explain them.
+In practice, you'll use all three together. Metrics alert you to problems, traces help you locate them, and logs explain
+them.
 
 ---
 
@@ -528,25 +563,32 @@ In practice, you'll use all three together. Metrics alert you to problems, trace
 
 Before we wrap up, here are the mistakes I see most often:
 
-1. **Unbounded Attributes:** Don't add `user.id` to metrics labels (cardinality explosion) — use events in spans instead, or use metrics with pre-aggregation
+1. **Unbounded Attributes:** Don't add `user.id` to metrics labels (cardinality explosion) — use events in spans
+   instead, or use metrics with pre-aggregation
 
-2. **Forgetting `span.end()`:** Leads to memory leaks and incomplete traces — always use try-finally or try-with-resources
+2. **Forgetting `span.end()`:** Leads to memory leaks and incomplete traces — always use try-finally or
+   try-with-resources
 
 3. **Averaging Latency:** Use histograms and percentiles, not `mean()` — averages hide outliers
 
-4. **Wrong Bucket Boundaries:** Test with real traffic patterns before settling on histogram buckets — too wide or too narrow both cause problems
+4. **Wrong Bucket Boundaries:** Test with real traffic patterns before settling on histogram buckets — too wide or too
+   narrow both cause problems
 
-5. **Logging Without Correlation:** Always propagate trace context to logs, either via OTel bridges or manual extraction — logs without trace IDs are much harder to debug
+5. **Logging Without Correlation:** Always propagate trace context to logs, either via OTel bridges or manual extraction
+   — logs without trace IDs are much harder to debug
 
-6. **Over-instrumenting:** Don't create a span for every function call — focus on meaningful units of work: HTTP requests, database queries, external API calls
+6. **Over-instrumenting:** Don't create a span for every function call — focus on meaningful units of work: HTTP
+   requests, database queries, external API calls
 
 ---
 
 ## Wrapping Up
 
-That's OpenTelemetry at its most stripped-down: **spans, metrics, and logs**, plus the **context** that stitches them into a single narrative.
+That's OpenTelemetry at its most stripped-down: **spans, metrics, and logs**, plus the **context** that stitches them
+into a single narrative.
 
-Once you see signals this way, dashboards stop looking like magic. They're just visualizations of structured data your app is already producing.
+Once you see signals this way, dashboards stop looking like magic. They're just visualizations of structured data your
+app is already producing.
 
 But we've only scratched the surface. Now that you understand what signals *are*, the real questions begin:
 
@@ -557,4 +599,5 @@ But we've only scratched the surface. Now that you understand what signals *are*
 * How does OTel integrate with existing frameworks like Spring Boot and Micrometer?
 * What practices separate noisy telemetry from production-grade instrumentation?
 
-This series will answer all of these. **Part 2** starts with the journey from code to collector — how signals are exported, batched, and routed to their final destinations.
+This series will answer all of these. **Part 2** starts with the journey from code to collector — how signals are
+exported, batched, and routed to their final destinations.

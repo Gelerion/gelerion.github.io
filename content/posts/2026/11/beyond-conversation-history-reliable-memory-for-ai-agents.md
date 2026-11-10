@@ -51,8 +51,8 @@ things change, and bringing it back at the step where the agent needs it.
 
 ## 1. The Server That Got Shut Down Twice
 
-Suppose you run an infrastructure cleanup agent called `CostGuard` that sweeps your staging environment (`staging-cloud`)
-every week, shutting down idle compute instances to trim cloud spend.
+Suppose you run an infrastructure cleanup agent called `CostGuard` that sweeps your staging environment
+(`staging-cloud`) every week, shutting down idle compute instances to trim cloud spend.
 
 Here is one week without structured runtime memory:
 
@@ -70,10 +70,10 @@ shows near-zero CPU utilization since the restart. With no memory of Monday's in
 other idle instance and shuts it down a second time.
 
 Two common approaches to cross-session memory both miss what matters here:  
-**Standard RAG** over chat logs misses the relevant constraint. Thursday's prompt is "Run the weekly staging cost cleanup."
-It never mentions `gpu-bench-01`, QA, or regression benchmarks. If retrieval runs only once, against the user's initial
-request, Monday's instruction has no reason to rank high enough to make the cut. The agent only learns that
-`gpu-bench-01` is involved after its cloud discovery tool returns mid-session.  
+**Standard RAG** over chat logs misses the relevant constraint. Thursday's prompt is "Run the weekly staging cost
+cleanup." It never mentions `gpu-bench-01`, QA, or regression benchmarks. If retrieval runs only once, against the
+user's initial request, Monday's instruction has no reason to rank high enough to make the cut. The agent only learns
+that `gpu-bench-01` is involved after its cloud discovery tool returns mid-session.
 **Rolling session summaries** mix stale history with live state. They can omit important details or carry forward
 observations that are no longer true. Last week's CPU metrics, or whether an instance was running several days ago,
 aren't worth remembering, because the cloud API gives live ground truth on demand. The instruction that changes how
@@ -153,8 +153,8 @@ def agent_step(task, context):
 This step repeats throughout the cleanup. The initial request only describes the high-level task, so the first recall
 pass pulls general workflow context. Once the agent lists the staging instances, however, the next iteration has
 concrete resource identifiers to search for, which surfaces any resource-specific restrictions before the agent decides
-what to shut down. Meanwhile, events from the current execution are recorded without waiting for background extraction to
-finish.
+what to shut down. Meanwhile, events from the current execution are recorded without waiting for background extraction
+to finish.
 
 ## 3. Episodic Memory: What Happened
 
@@ -379,7 +379,8 @@ Fact extraction runs in the same background consolidation worker that builds epi
 reaches a checkpoint, the worker records the recovery episode and inspects the engineer's feedback for durable facts
 worth carrying into future sessions.
 
-![Consolidating Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extracting_rules_and_episodes.png)
+![Consolidating
+Events](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_extracting_rules_and_episodes.png)
 
 In this example, the engineer's message is the source of the new fact. Other agents might extract reusable knowledge
 from tool results, task outcomes, or external observations. The extraction process follows the same pattern:
@@ -444,38 +445,38 @@ Both observations are captured through normal runtime events, yet neither proves
 expired. Low utilization midweek is consistent with a machine reserved for weekend benchmarks, and the
 developer's remark is speculative, offering no evidence that QA has migrated its workload.
 
-A memory system that continually asks an LLM to rewrite a rolling entity summary, or blindly overwrites stored facts with
-the latest observation, will easily mistake these signals for proof that the restriction is obsolete. Suppose the memory
-record shifts from *"Keep this instance running for weekend QA benchmarks"* to *"Instance has been idle for 48 hours;
-developer suggests shutting it down."* Both statements reflect something the agent observed, but the second carries a
-different level of authority and doesn't invalidate the first. Replacing the old fact with the latest observation wipes
-out the instruction that matters.
+A memory system that continually asks an LLM to rewrite a rolling entity summary, or blindly overwrites stored facts
+with the latest observation, will easily mistake these signals for proof that the restriction is obsolete. Suppose the
+memory record shifts from *"Keep this instance running for weekend QA benchmarks"* to *"Instance has been idle for 48
+hours; developer suggests shutting it down."* Both statements reflect something the agent observed, but the second
+carries a different level of authority and doesn't invalidate the first. Replacing the old fact with the latest
+observation wipes out the instruction that matters.
 
 ### Reconciling New Evidence with Existing Facts
 
-Before accepting a new candidate fact, the consolidation worker looks for a `current` fact with the same scope, canonical
-entity identifier, and attribute. With none, an authorized statement becomes `current` and an unauthorized claim is
-recorded as `unverified`. With one, the worker compares the incoming signal against it:
+Before accepting a new candidate fact, the consolidation worker looks for a `current` fact with the same scope,
+canonical entity identifier, and attribute. With none, an authorized statement becomes `current` and an unauthorized
+claim is recorded as `unverified`. With one, the worker compares the incoming signal against it:
 
 ![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s4_reconciling.png)
 
 The first three branches leave the current fact untouched. A restatement just adds its evidence to the existing fact.
-Idle metrics are ignored: they describe the instance's state rather than a rule, and the event log and cloud APIs already
-hold that data. An unauthorized comment like "Probably shut it down" is recorded as `unverified`, so casual chat can't
-silently override an approved restriction.
+Idle metrics are ignored: they describe the instance's state rather than a rule, and the event log and cloud APIs
+already hold that data. An unauthorized comment like "Probably shut it down" is recorded as `unverified`, so casual chat
+can't silently override an approved restriction.
 
 The other two branches change the fact and need an authoritative source. Suppose the infrastructure lead says, "QA has
 changed its plans. Keep the instance reserved through next week's final benchmark instead of waiting for the Kubernetes
-migration." The lead can modify lifecycle policies, so the old fact becomes `superseded` and the new one becomes `current`
-with its own source, even though the original migration condition wasn't met.
+migration." The lead can modify lifecycle policies, so the old fact becomes `superseded` and the new one becomes
+`current` with its own source, even though the original migration condition wasn't met.
 
 A fact also ends when its `ends_when` condition is met, but conditions aren't self-verifying. The runtime waits for
 confirmation from an authorized operator or an authoritative system before marking the fact `retired`. That lifts the
-exemption without forcing a shutdown: the standard cleanup policy applies again. Superseded and retired facts stay in the
-store as an audit trail but are excluded from active retrieval.
+exemption without forcing a shutdown: the standard cleanup policy applies again. Superseded and retired facts stay in
+the store as an audit trail but are excluded from active retrieval.
 
-In the midweek scenario, neither the idle metrics nor the developer's comment has the authority to change the restriction, so
-the active semantic fact remains unchanged:
+In the midweek scenario, neither the idle metrics nor the developer's comment has the authority to change the
+restriction, so the active semantic fact remains unchanged:
 
 ```json
 {
@@ -693,7 +694,8 @@ To see what the assembled context might look like, imagine a subsequent cleanup 
 approved. The agent has discovered the staging instances and collected their current metrics. Its working memory now
 contains:
 
-![Reconciling Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s6_agent_working_memory_example.png)
+![Reconciling
+Rules](/images/beyond-conversation-history-reliable-memory-for-ai-agents/s6_agent_working_memory_example.png)
 
 Instead of feeding the model an entire conversation transcript or replaying the raw event log, the runtime hands it a
 compact, task-specific view: live metrics describe the current resource state, the semantic fact carries the standing

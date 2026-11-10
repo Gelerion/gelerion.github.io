@@ -180,17 +180,22 @@ Subscribe via RSS:
 - **Slug**: keeps URLs clean even if you rename the title later.  
 - **Series/Categories**: helps you build multi-part deep-dives and group conceptually similar posts.  
 - **Images & social text**: ensures each share on Twitter/LinkedIn looks great without extra per-post work.  
-- **Structured body**: a predictable pattern (Intro → Context → Concepts → Implementation → Conclusion) guides readers through even complex topics.
+- **Structured body**: a predictable pattern (Intro → Context → Concepts → Implementation → Conclusion) guides readers
+  through even complex topics.
 
 ### Visuals and Emphasis
-Use images to illustrate concepts, architectures, or results. Place images relative to your post, perhaps using [Hugo's Page Bundles](https://gohugo.io/content-management/page-bundles/) (e.g., store images in the same folder as an index.md post file)
+Use images to illustrate concepts, architectures, or results. Place images relative to your post, perhaps using [Hugo's
+Page Bundles](https://gohugo.io/content-management/page-bundles/) (e.g., store images in the same folder as an index.md
+post file)
   
-![Alt text describing the image for accessibility and SEO](/images/relative/path/to/your/image.png "Optional: Image title on hover")
+![Alt text describing the image for accessibility and SEO](/images/relative/path/to/your/image.png "Optional: Image
+title on hover")
   
 Use blockquotes for highlighting important notes, warnings, or quotes:
 > **Important**: Always back up your configuration before making significant changes.
   
-Link to relevant external resources or other posts on your blog:
-For more details, see the [official Spark documentation](https://spark.apache.org/) or my previous post on [Setting up Spark]({{< ref "/posts/2023/04/common_pitfalls_to_avoid_publishing_artifacts_on_maven_central.md" >}}).
+Link to relevant external resources or other posts on your blog: For more details, see the [official Spark
+documentation](https://spark.apache.org/) or my previous post on [Setting up Spark]({{< ref
+"/posts/2023/04/common_pitfalls_to_avoid_publishing_artifacts_on_maven_central.md" >}}).
 
 (Note: Using **ref** is Hugo's robust way to create internal links that won't break if content moves).
