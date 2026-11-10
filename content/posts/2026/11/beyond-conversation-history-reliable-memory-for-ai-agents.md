@@ -69,12 +69,12 @@ The agent queries the cloud provider, lists the running instances, and checks th
 shows near-zero CPU utilization since the restart. With no memory of Monday's instruction, it treats the server like any
 other idle instance and shuts it down a second time.
 
-Two common approaches to cross-session memory both miss what matters here:  
-**Standard RAG** over chat logs misses the relevant constraint. Thursday's prompt is "Run the weekly staging cost
+Two common approaches to cross-session memory both miss what matters here:
+* **Standard RAG** over chat logs misses the relevant constraint. Thursday's prompt is "Run the weekly staging cost
 cleanup." It never mentions `gpu-bench-01`, QA, or regression benchmarks. If retrieval runs only once, against the
 user's initial request, Monday's instruction has no reason to rank high enough to make the cut. The agent only learns
 that `gpu-bench-01` is involved after its cloud discovery tool returns mid-session.
-**Rolling session summaries** mix stale history with live state. They can omit important details or carry forward
+* **Rolling session summaries** mix stale history with live state. They can omit important details or carry forward
 observations that are no longer true. Last week's CPU metrics, or whether an instance was running several days ago,
 aren't worth remembering, because the cloud API gives live ground truth on demand. The instruction that changes how
 those metrics should be read is the part worth keeping.
